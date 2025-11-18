@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlassian Interview Prep</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- Highlight.js for Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+
+    <!-- Load Content Data -->
+    <script src="content_data.js"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Markdown Styles Override for Dark Mode */
+        .markdown-body h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 1.5rem; color: #60a5fa; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }
+        .markdown-body h2 { font-size: 1.875rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; color: #93c5fd; }
+        .markdown-body h3 { font-size: 1.5rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #bfdbfe; }
+        .markdown-body p { margin-bottom: 1rem; line-height: 1.75; color: #e2e8f0; }
+        .markdown-body ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
+        .markdown-body ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
+        .markdown-body blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; font-style: italic; color: #94a3b8; background: #1e293b; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1rem; }
+        .markdown-body code { background-color: #334155; color: #e2e8f0; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.9em; }
+        
+        /* Code Blocks */
+        .markdown-body pre { 
+            background-color: #1e293b; 
+            padding: 0; /* Padding handled by wrapper */
+            border-radius: 0.5rem; 
+            overflow-x: auto; 
+            margin-bottom: 1.5rem; 
+            border: 1px solid #334155;
+            color: #f3f4f6 !important; /* Force light text */
+        }
+        .markdown-body pre code { 
+            background-color: transparent; 
+            padding: 1rem; 
+            display: block; 
+            color: inherit; /* Inherit form pre */
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Code Block Wrapper & Badge */
+        .code-block-wrapper {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+        .language-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #334155;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-bottom-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            text-transform: uppercase;
+            z-index: 10;
+        }
+
+        /* Fix for HLJS text color override */
+        .hljs {
+            color: #abb2bf !important; /* Atom One Dark default text color */
+            background: transparent !important;
+        }
+        
+        .markdown-body a { color: #60a5fa; text-decoration: underline; text-underline-offset: 4px; }
+        .markdown-body a:hover { color: #93c5fd; }
+        
+        .markdown-body hr { border: 0; border-top: 1px solid #334155; margin: 2rem 0; }
+        
+        /* Table Styles */
+        .markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        .markdown-body th, .markdown-body td { border: 1px solid #334155; padding: 0.75rem; text-align: left; }
+        .markdown-body th { background-color: #1e293b; font-weight: 600; color: #93c5fd; }
+        .markdown-body tr:nth-child(even) { background-color: #0f172a; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans h-screen overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Markdown Renderer Setup ---
+        const renderer = new marked.Renderer();
+        
+        // Custom Link Renderer for external vs internal links
+        renderer.link = function(href, title, text) {
+            // Safe handling for marked.js signature changes
+            let actualHref = href;
+            let actualText = text;
+            
+            if (typeof href === 'object' && href !== null) {
+                actualHref = href.href;
+                actualText = href.text;
+            }
+
+            return `<a href="${actualHref}" target="_blank" rel="noopener noreferrer">${actualText}</a>`;
+        };
+
+        renderer.code = function(codeBlock, language) {
+            let code = codeBlock;
+            let lang = language;
+
+            if (typeof codeBlock === 'object' && codeBlock !== null) {
+                code = codeBlock.text || '';
+                lang = codeBlock.lang || '';
+            }
+
+            code = String(code);
+            const validLang = !!(lang && hljs.getLanguage(lang));
+            
+            let highlighted;
+            try {
+                if (validLang) {
+                    const result = hljs.highlight(code, { language: lang });
+                    highlighted = result.value;
+                } else {
+                    const result = hljs.highlightAuto(code);
+                    highlighted = result.value;
+                }
+            } catch (e) {
+                highlighted = code;
+            }
+
+            let displayLang = lang || 'text';
+            if (displayLang === 'python') displayLang = 'Python';
+            if (displayLang === 'js' || displayLang === 'javascript') displayLang = 'JavaScript';
+            if (displayLang === 'ts' || displayLang === 'typescript') displayLang = 'TypeScript';
+            if (displayLang === 'bash') displayLang = 'Terminal';
+
+            return `
+                <div class="code-block-wrapper">
+                    <span class="language-badge">${displayLang}</span>
+                    <pre><code class="hljs ${lang || ''}">${highlighted}</code></pre>
+                </div>
+            `;
+        };
+
+        marked.setOptions({
+            renderer: renderer,
+            gfm: true,
+            breaks: true
+        });
+
+        // --- Components ---
+
+        const Sidebar = ({ items, activeItem, onItemClick }) => {
+            return (
+                <div className="w-80 bg-slate-900 border-r border-slate-800 h-full flex flex-col">
+                    <div className="p-6 border-b border-slate-800 bg-slate-900 z-10">
+                        <h1 className="text-xl font-bold text-blue-400 tracking-tight">
+                            Atlassian Prep 🚀
+                        </h1>
+                        <p className="text-xs text-slate-500 mt-2 uppercase font-semibold tracking-wider">
+                            Data Structures Round
+                        </p>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                        {items.map((item, idx) => {
+                            const isActive = activeItem && activeItem.path === item.path;
+                            return (
+                                <button
+                                    key={idx}
+                                    onClick={() => onItemClick(item)}
+                                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-all duration-200 group flex items-center ${
+                                        isActive 
+                                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <span className={`mr-3 text-lg ${isActive ? 'opacity-100' : 'opacity-50 group-hover:opacity-100'}`}>
+                                        {idx < 9 ? `0${idx + 1}` : idx + 1}
+                                    </span>
+                                    <span className="font-medium truncate">
+                                        {item.title || item.name}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    
+                    <div className="p-4 border-t border-slate-800 text-xs text-slate-600 text-center">
+                        Updated: {new Date().toLocaleDateString()}
+                    </div>
+                </div>
+            );
+        };
+
+        const ContentArea = ({ content }) => {
+            const htmlContent = useMemo(() => {
+                if (!content) return '';
+                try {
+                    return marked.parse(content);
+                } catch (e) {
+                    return `<p class="text-red-400">Error rendering markdown: ${e.message}</p>`;
+                }
+            }, [content]);
+
+            if (!content) {
+                return (
+                    <div className="flex-1 flex items-center justify-center text-slate-500 flex-col animate-pulse">
+                        <div className="w-16 h-16 bg-slate-800 rounded-full mb-4 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        </div>
+                        <p>Select a topic from the sidebar to begin</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex-1 overflow-y-auto bg-slate-950 relative">
+                    <div className="max-w-4xl mx-auto px-8 py-12">
+                        <div 
+                            className="markdown-body"
+                            dangerouslySetInnerHTML={{ __html: htmlContent }}
+                        />
+                        <div className="h-24"></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [items, setItems] = useState([]);
+            const [activeItem, setActiveItem] = useState(null);
+
+            useEffect(() => {
+                if (window.CONTENT_DATA) {
+                    // Data Structure:
+                    // window.CONTENT_DATA is Array of children of "Interview_Preparation".
+                    // We look for the directory named "Data_Structures".
+                    const dsItems = window.CONTENT_DATA
+                        .find(c => c.name === "Data_Structures")
+                        ?.children || [];
+
+                    // Sort by filename
+                    dsItems.sort((a, b) => a.name.localeCompare(b.name));
+
+                    // Process items
+                    const processedItems = dsItems.map(item => ({
+                        ...item,
+                        title: item.name.replace(/^\d+_/, '').replace(/\.md$/, '').replace(/_/g, ' ')
+                    }));
+
+                    setItems(processedItems);
+                    
+                    if (processedItems.length > 0) {
+                        setActiveItem(processedItems[0]);
+                    }
+                }
+            }, []);
+
+            return (
+                <div className="flex h-screen bg-slate-950 text-slate-200">
+                    <Sidebar 
+                        items={items} 
+                        activeItem={activeItem} 
+                        onItemClick={setActiveItem} 
+                    />
+                    <ContentArea content={activeItem?.content} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
