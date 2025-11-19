@@ -1,4 +1,4 @@
-{
+window.EXPERIENCES_DATA = {
   "metadata": {
     "total_articles": 373,
     "fetched_at": "2025-11-13T05:19:39.665190",
@@ -12129,4 +12129,4 @@
       "fetched_at": "2025-11-13T05:19:39.660078"
     }
   ]
-}
+};

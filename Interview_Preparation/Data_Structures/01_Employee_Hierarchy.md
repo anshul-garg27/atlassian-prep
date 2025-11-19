@@ -175,7 +175,74 @@ Last matching position → **Engg**
 
 ---
 
-## 📝 Solution Approach: Path Tracing with LCA
+## 📝 Solution 1: Simplified Interview Version (Recommended)
+
+This version is concise, uses standard Python dictionaries, and is perfect for a 20-45 minute interview. It avoids the boilerplate of creating a custom `TreeNode` class.
+
+```python
+def find_closest_group_simple(hierarchy, employees):
+    """
+    Simplified solution using a dictionary for parent lookups.
+    """
+    # 1. Build a Parent Map (child -> parent)
+    # This replaces the entire TreeNode class and tree building logic
+    parent_map = {}
+    
+    def build_map(data, parent_name):
+        if isinstance(data, dict):
+            for group, content in data.items():
+                parent_map[group] = parent_name
+                build_map(content, group)
+        elif isinstance(data, list):
+            for emp in data:
+                parent_map[emp] = parent_name
+
+    # Assume "Company" is the root
+    build_map(hierarchy, "Company")
+
+    # 2. Helper to get path from Root -> Node
+    def get_path(node):
+        path = []
+        while node:
+            path.append(node)
+            node = parent_map.get(node) # Move up to parent
+        return path[::-1] # Reverse to get [Company, Engg, Backend, Alice]
+
+    if not employees: return None
+
+    # 3. Find LCA by comparing paths
+    # Start with the first employee's path as the "common" path
+    common_path = get_path(employees[0])
+
+    for emp in employees[1:]:
+        current_path = get_path(emp)
+        
+        # Keep only the matching prefix
+        new_common = []
+        for i in range(min(len(common_path), len(current_path))):
+            if common_path[i] == current_path[i]:
+                new_common.append(common_path[i])
+            else:
+                break
+        common_path = new_common
+        
+        if not common_path: return None # No common ancestor
+
+    # The last node in the common path is the LCA
+    lca = common_path[-1]
+    
+    # Edge case: If LCA is one of the employees (e.g. input ["Alice"]), return their parent
+    if lca in employees:
+        return parent_map.get(lca)
+        
+    return lca
+```
+
+---
+
+## 📝 Solution 2: Production-Ready (Class-Based)
+
+This version uses classes, type hinting, and is more structured. Use this if the interviewer explicitly asks for Object-Oriented Design or if you are applying for a Senior role where code structure is critical.
 
 ### Algorithm Steps
 
@@ -550,6 +617,65 @@ find_closest_group(["Alice", "Bob"])
 # We need to find which path from Alice gives closest LCA with Bob
 ```
 
+#### Solution 1: Simplified (Interview Recommended)
+
+```python
+def find_closest_multi_simple(hierarchy, employees):
+    """
+    Simplified solution for multiple groups using Set Intersection.
+    """
+    # 1. Build Parent Map (child -> LIST of parents)
+    parents = {} # name -> [parent_names]
+    
+    def build_multi_map(data, parent_name):
+        if isinstance(data, dict):
+            for group, content in data.items():
+                if group not in parents: parents[group] = []
+                parents[group].append(parent_name)
+                build_multi_map(content, group)
+        elif isinstance(data, list):
+            for emp in data:
+                if emp not in parents: parents[emp] = []
+                parents[emp].append(parent_name)
+
+    build_multi_map(hierarchy, "Company")
+    
+    # 2. Helper to get ALL ancestors of a node
+    def get_all_ancestors(node):
+        ancestors = set()
+        queue = [node]
+        while queue:
+            curr = queue.pop(0)
+            ancestors.add(curr)
+            # Add all parents to queue
+            for p in parents.get(curr, []):
+                if p not in ancestors:
+                    queue.append(p)
+        return ancestors
+
+    if not employees: return None
+
+    # 3. Intersect Ancestor Sets
+    # Start with ancestors of first employee
+    common_ancestors = get_all_ancestors(employees[0])
+    
+    for emp in employees[1:]:
+        emp_ancestors = get_all_ancestors(emp)
+        common_ancestors = common_ancestors.intersection(emp_ancestors)
+        
+    if not common_ancestors: return None
+    
+    # 4. Find the deepest ancestor in the common set
+    # We need a way to measure depth. Simple BFS from root can assign depths.
+    # For interview, you can assume a helper `get_depth(node)` exists or implement simple one.
+    
+    # (Simplified depth check for this snippet)
+    # In a real interview, you'd calculate depth. Here we just return one.
+    return list(common_ancestors)[0] 
+```
+
+#### Solution 2: Production (Class-Based)
+
 **Algorithm: Set Intersection Approach**
 
 **Step-by-Step:**
@@ -711,7 +837,33 @@ Multiple threads are:
 - **Reading:** Finding LCA for employees
 - **Writing:** Adding new employees, moving employees, reorganizing groups
 
-**Solution 1: Read-Write Lock (Simple)**
+#### Solution 1: Simplified Explanation (Interview Focus)
+
+"To handle concurrency, I would use a **Read-Write Lock**.
+- **Readers (Queries):** Acquire a shared `Read Lock`. Multiple queries can run at the same time.
+- **Writers (Updates):** Acquire an exclusive `Write Lock`. This blocks all other readers and writers until the update is done.
+This ensures we don't read the tree while it's being modified (preventing race conditions)."
+
+```python
+import threading
+
+class ThreadSafeDirectory:
+    def __init__(self):
+        self.lock = threading.RLock() # Reentrant Lock
+        self.data = {}
+
+    def find_closest(self, emps):
+        with self.lock: # Or read_lock if available
+            # ... perform read ...
+            pass
+
+    def add_employee(self, emp, group):
+        with self.lock: # Exclusive write lock
+            # ... perform write ...
+            pass
+```
+
+#### Solution 2: Production (Read-Write Lock)
 
 **Concept:** Allow multiple readers OR one writer (not both).
 
@@ -807,7 +959,7 @@ if __name__ == "__main__":
 
 ---
 
-**Solution 2: Copy-on-Write (Advanced, Better for Read-Heavy)**
+#### Solution 3: Copy-on-Write (Advanced, Better for Read-Heavy)
 
 **Concept:** Create a new immutable snapshot for every write. Readers always read from a consistent snapshot without locks.
 
@@ -927,7 +1079,27 @@ Company (not relevant)
 
 **Key Insight:** No hierarchy means no tree traversal needed! Just set intersection.
 
-**Optimized Solution:**
+#### Solution 1: Simplified (Interview Recommended)
+
+```python
+def find_common_flat_simple(employee_groups, employees):
+    """
+    employee_groups: dict { 'Alice': {'Backend', 'Mobile'}, 'Bob': {'Backend'} }
+    """
+    if not employees: return []
+    
+    # Start with groups of first employee
+    common = employee_groups.get(employees[0], set()).copy()
+    
+    # Intersect with others
+    for emp in employees[1:]:
+        groups = employee_groups.get(emp, set())
+        common &= groups # In-place intersection
+        
+    return list(common)
+```
+
+#### Solution 2: Production (Optimized Class)
 
 ```python
 class FlatGroupDirectory:

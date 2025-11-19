@@ -163,7 +163,70 @@ Query maximum():
 
 ---
 
-## 📝 Complete Solution
+## 📝 Solution 1: Simplified Interview Version (Recommended)
+
+This version is concise and focuses on the core logic: using heaps for min/max and a dictionary for the "ground truth". It includes a runnable example block.
+
+```python
+import heapq
+
+class StockPriceSimple:
+    def __init__(self):
+        self.prices = {}  # timestamp -> price
+        self.latest_time = 0
+        self.min_heap = [] # (price, timestamp)
+        self.max_heap = [] # (-price, timestamp)
+
+    def update(self, timestamp, price):
+        # 1. Update ground truth
+        self.prices[timestamp] = price
+        self.latest_time = max(self.latest_time, timestamp)
+        
+        # 2. Push to heaps (don't remove old entries)
+        heapq.heappush(self.min_heap, (price, timestamp))
+        heapq.heappush(self.max_heap, (-price, timestamp))
+
+    def current(self):
+        return self.prices[self.latest_time]
+
+    def maximum(self):
+        # Pop stale entries from top
+        while True:
+            price, ts = self.max_heap[0]
+            if self.prices[ts] == -price:
+                return -price
+            heapq.heappop(self.max_heap)
+
+    def minimum(self):
+        # Pop stale entries from top
+        while True:
+            price, ts = self.min_heap[0]
+            if self.prices[ts] == price:
+                return price
+            heapq.heappop(self.min_heap)
+
+# --- Runnable Example for Interview ---
+if __name__ == "__main__":
+    tracker = StockPriceSimple()
+    
+    # 1. Basic Updates
+    tracker.update(1, 10)
+    tracker.update(2, 5)
+    print(f"Current: {tracker.current()}") # Expected: 5
+    print(f"Max: {tracker.maximum()}")     # Expected: 10
+    print(f"Min: {tracker.minimum()}")     # Expected: 5
+    
+    # 2. Correction (Update existing timestamp)
+    tracker.update(1, 3)
+    print(f"Max after correction: {tracker.maximum()}") # Expected: 5 (10 is gone)
+    print(f"Min after correction: {tracker.minimum()}") # Expected: 3
+```
+
+---
+
+## 📝 Solution 2: Production-Ready (Class-Based)
+
+This version includes type hinting, docstrings, and explicit handling of edge cases.
 
 ```python
 import heapq
@@ -443,7 +506,39 @@ Operation Sequence:
 └────────────────────────────────────────────────────────┘
 ```
 
-**Complete Implementation:**
+#### Solution 1: Simplified (Interview Recommended)
+
+```python
+class StockPriceAvgSimple(StockPriceSimple):
+    def __init__(self):
+        super().__init__()
+        self.total_sum = 0
+        self.count = 0
+
+    def update(self, timestamp, price):
+        # Check if it's an update or new timestamp
+        if timestamp in self.prices:
+            self.total_sum -= self.prices[timestamp] # Remove old
+        else:
+            self.count += 1 # New timestamp
+            
+        self.total_sum += price # Add new
+        super().update(timestamp, price)
+
+    def average(self):
+        return self.total_sum / self.count if self.count else 0
+
+# --- Runnable Example ---
+if __name__ == "__main__":
+    tracker = StockPriceAvgSimple()
+    tracker.update(1, 100)
+    tracker.update(2, 200)
+    print(f"Avg: {tracker.average()}") # 150.0
+    tracker.update(1, 50) # Correction
+    print(f"Avg after correction: {tracker.average()}") # 125.0
+```
+
+#### Solution 2: Production (Class-Based)
 
 ```python
 from typing import Optional
@@ -570,140 +665,31 @@ Without synchronization:
 
 **Solution Approaches:**
 
+#### Solution 1: Simplified (Interview Recommended)
+
 **Approach 1: Simple Lock (Good for most cases)**
 
 ```python
 import threading
 from typing import Optional
 
-class ThreadSafeStockPrice(StockPrice):
-    """
-    Thread-safe stock price tracker using a reentrant lock.
-    
-    Single lock protects all operations.
-    Simple but can bottleneck under high contention.
-    """
-    
+class ThreadSafeStockSimple(StockPriceSimple):
     def __init__(self):
         super().__init__()
-        self.lock = threading.RLock()  # Reentrant lock allows recursive calls
-    
-    def update(self, timestamp: int, price: int) -> None:
-        """
-        Thread-safe update operation.
-        
-        Time: O(log N) + lock overhead
-        """
+        self.lock = threading.Lock()
+
+    def update(self, timestamp, price):
         with self.lock:
             super().update(timestamp, price)
-    
-    def current(self) -> int:
-        """
-        Thread-safe current price query.
-        
-        Time: O(1) + lock overhead
-        """
+
+    def current(self):
         with self.lock:
             return super().current()
-    
-    def maximum(self) -> int:
-        """
-        Thread-safe maximum price query.
-        
-        Time: Amortized O(log N) + lock overhead
-        """
-        with self.lock:
-            return super().maximum()
-    
-    def minimum(self) -> int:
-        """
-        Thread-safe minimum price query.
-        
-        Time: Amortized O(log N) + lock overhead
-        """
-        with self.lock:
-            return super().minimum()
-
-
-# ============================================
-# THREADING EXAMPLE
-# ============================================
-
-if __name__ == "__main__":
-    import time
-    import random
-    
-    print("\n" + "=" * 60)
-    print("FOLLOW-UP 2: THREAD SAFETY")
-    print("=" * 60)
-    
-    tracker = ThreadSafeStockPrice()
-    results = {"updates": 0, "queries": 0, "errors": 0}
-    
-    def writer_thread(thread_id: int, num_updates: int):
-        """Simulate writer thread updating prices."""
-        for i in range(num_updates):
-            try:
-                timestamp = random.randint(1, 100)
-                price = random.randint(50, 150)
-                tracker.update(timestamp, price)
-                results["updates"] += 1
-                time.sleep(0.001)  # Simulate work
-            except Exception as e:
-                print(f"Writer {thread_id} error: {e}")
-                results["errors"] += 1
-    
-    def reader_thread(thread_id: int, num_queries: int):
-        """Simulate reader thread querying prices."""
-        for i in range(num_queries):
-            try:
-                # Random query type
-                query_type = random.choice(['current', 'max', 'min'])
-                if query_type == 'current' and tracker.timestamp_to_price:
-                    _ = tracker.current()
-                elif query_type == 'max':
-                    _ = tracker.maximum()
-                else:
-                    _ = tracker.minimum()
-                results["queries"] += 1
-                time.sleep(0.001)  # Simulate work
-            except Exception as e:
-                print(f"Reader {thread_id} error: {e}")
-                results["errors"] += 1
-    
-    # Create threads
-    print("\nStarting concurrent operations...")
-    writers = [
-        threading.Thread(target=writer_thread, args=(i, 50))
-        for i in range(3)
-    ]
-    readers = [
-        threading.Thread(target=reader_thread, args=(i, 50))
-        for i in range(5)
-    ]
-    
-    # Start all threads
-    start_time = time.time()
-    for t in writers + readers:
-        t.start()
-    
-    # Wait for completion
-    for t in writers + readers:
-        t.join()
-    
-    elapsed = time.time() - start_time
-    
-    # Report results
-    print(f"\n{'=' * 60}")
-    print("Results:")
-    print(f"  Total Updates: {results['updates']}")
-    print(f"  Total Queries: {results['queries']}")
-    print(f"  Errors: {results['errors']}")
-    print(f"  Time: {elapsed:.2f}s")
-    print(f"  Unique Timestamps: {len(tracker.timestamp_to_price)}")
-    print(f"  Heap Size: {len(tracker.max_heap)}")
-    print(f"{'=' * 60}")
+            
+    # ... same for maximum/minimum
 ```
+
+#### Solution 2: Production (Read-Write Lock)
 
 **Approach 2: Read-Write Lock (Advanced)**
 
@@ -824,7 +810,21 @@ Query: getMaxInRange(2, 4)
 - Result: max(5, 15) = 15
 ```
 
-**Implementation:**
+#### Solution 1: Simplified (Interview Recommended)
+
+```python
+# Simplified Segment Tree Node
+class Node:
+    def __init__(self, start, end):
+        self.start, self.end = start, end
+        self.max_val = 0
+        self.left = self.right = None
+
+# Recursive build and query logic would go here
+# (Usually too long to write fully in 15 mins, focus on concept)
+```
+
+#### Solution 2: Production (Full Segment Tree)
 
 ```python
 class SegmentTreeNode:
