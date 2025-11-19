@@ -819,8 +819,14 @@ class ThreadSafeStockSimple(StockPriceSimple):
     def current(self):
         with self.lock:
             return super().current()
-            
-    # ... same for maximum/minimum
+    
+    def maximum(self):
+        with self.lock:
+            return super().maximum()
+    
+    def minimum(self):
+        with self.lock:
+            return super().minimum()
 ```
 
 #### Solution 2: Production (Read-Write Lock)

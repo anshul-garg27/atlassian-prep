@@ -824,7 +824,21 @@ class MiddlewareRouter:
                 return {"handler": node.handler, "middlewares": accumulated}
             return None
         
-        # ... (same DFS logic, pass accumulated to recursive calls)
+        segment = segments[index]
+        
+        # Try exact match first (higher priority)
+        if segment in node.children:
+            result = self._dfs(node.children[segment], segments, index + 1, accumulated)
+            if result:
+                return result
+        
+        # Try wildcard match second
+        if '*' in node.children:
+            result = self._dfs(node.children['*'], segments, index + 1, accumulated)
+            if result:
+                return result
+        
+        return None
 ```
 
 ---

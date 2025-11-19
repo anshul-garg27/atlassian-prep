@@ -753,9 +753,124 @@ class LiveReportGenerator:
 > "Files have timestamps. Support queries like 'Top K collections for files added in the last 24 hours'."
 
 **Solution:**
-- Maintain a **time-indexed data structure** (e.g., sorted by timestamp).
-- For each query, filter files by timestamp range, then aggregate.
-- **Optimization:** Use a **sliding window** with two pointers if queries are chronological.
+
+```python
+from collections import defaultdict
+from typing import List, Dict, Tuple
+import heapq
+
+@dataclass
+class FileWithTimestamp:
+    name: str
+    size: int
+    collectionId: Optional[str]
+    timestamp: int  # Unix timestamp
+
+class TimeBasedReportGenerator:
+    """
+    Generate reports for files within a time range.
+    """
+    
+    def __init__(self, k: int):
+        self.k = k
+        self.files = []  # Sorted by timestamp
+    
+    def add_file(self, file: FileWithTimestamp) -> None:
+        """
+        Add file (assume files added in chronological order).
+        
+        Time: O(1) amortized
+        """
+        # If not chronological, use bisect.insort for O(log N)
+        self.files.append(file)
+    
+    def get_report_for_range(self, start_time: int, end_time: int) -> Dict:
+        """
+        Get Top K collections for files in time range [start_time, end_time].
+        
+        Args:
+            start_time: Start timestamp (inclusive)
+            end_time: End timestamp (inclusive)
+        
+        Returns:
+            Report dict with total_size and top_collections
+        
+        Time: O(M + C log K) where M = files in range, C = collections
+        """
+        total_size = 0
+        collection_sizes = defaultdict(int)
+        
+        # Sliding window to find files in range
+        for file in self.files:
+            if start_time <= file.timestamp <= end_time:
+                total_size += file.size
+                if file.collectionId:
+                    collection_sizes[file.collectionId] += file.size
+        
+        # Get Top K
+        top_k = heapq.nlargest(
+            self.k,
+            collection_sizes.items(),
+            key=lambda x: x[1]
+        )
+        
+        return {
+            "total_size": total_size,
+            "top_collections": top_k
+        }
+
+
+# Example Usage
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 3: TIME-BASED QUERIES")
+    print("=" * 60)
+    
+    generator = TimeBasedReportGenerator(k=2)
+    
+    # Add files with timestamps (Unix time: day 1-3)
+    generator.add_file(FileWithTimestamp("f1", 100, "A", timestamp=1))
+    generator.add_file(FileWithTimestamp("f2", 200, "B", timestamp=2))
+    generator.add_file(FileWithTimestamp("f3", 150, "A", timestamp=3))
+    generator.add_file(FileWithTimestamp("f4", 300, "C", timestamp=4))
+    
+    # Query last 2 days (timestamps 2-3)
+    report = generator.get_report_for_range(2, 3)
+    print(f"Files in range [2, 3]:")
+    print(f"  Total Size: {report['total_size']}")
+    print(f"  Top 2 Collections: {report['top_collections']}")
+```
+
+**Optimization for Sorted Files:**
+If files are always sorted by timestamp, use binary search for O(log N) lookup:
+
+```python
+def get_report_for_range_optimized(self, start_time: int, end_time: int) -> Dict:
+    """Binary search for range boundaries."""
+    import bisect
+    
+    timestamps = [f.timestamp for f in self.files]
+    left_idx = bisect.bisect_left(timestamps, start_time)
+    right_idx = bisect.bisect_right(timestamps, end_time)
+    
+    # Process only files in range
+    total_size = 0
+    collection_sizes = defaultdict(int)
+    
+    for i in range(left_idx, right_idx):
+        file = self.files[i]
+        total_size += file.size
+        if file.collectionId:
+            collection_sizes[file.collectionId] += file.size
+    
+    top_k = heapq.nlargest(self.k, collection_sizes.items(), key=lambda x: x[1])
+    
+    return {"total_size": total_size, "top_collections": top_k}
+```
+
+**Complexity:**
+- With binary search: O(log N + M + C log K) where M = files in range
+- Without: O(N) where N = total files
 
 ---
 

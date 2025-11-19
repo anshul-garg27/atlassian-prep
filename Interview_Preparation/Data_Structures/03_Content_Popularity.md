@@ -488,7 +488,18 @@ class RecencyTracker(PopularityTracker):
     # Override _add_node_after to use RecencyNode
     def _add_node_after(self, prev_node, count):
         new_node = RecencyNode(count)
-        # ... (link logic same as parent) ...
+        
+        # Link the new node into the DLL
+        next_node = prev_node.next
+        
+        # Update forward links
+        prev_node.next = new_node
+        new_node.prev = prev_node
+        
+        # Update backward links
+        new_node.next = next_node
+        next_node.prev = new_node
+        
         return new_node
         
     def mostPopular(self):

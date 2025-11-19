@@ -801,8 +801,18 @@ def assign_courts_with_preferences(bookings: List[BookingWithPreference]) -> Lis
                 court_finish = courts[pref_idx].get_finish_time()
                 if court_finish <= booking.start:
                     courts[pref_idx].add_booking(booking)
-                    # Update heap (find and update entry - complex)
-                    # Simplified: rebuild heap
+                    
+                    # Update heap: Remove old entry for this court and add new one
+                    # Find and remove old entry (linear search in heap)
+                    heap_copy = []
+                    for entry in heap:
+                        if entry[1] != pref_idx:  # Keep entries for other courts
+                            heap_copy.append(entry)
+                    heap[:] = heap_copy
+                    heapq.heapify(heap)
+                    
+                    # Add updated entry
+                    heapq.heappush(heap, (booking.finish, pref_idx))
                     assigned = True
         
         # Fall back to any free court

@@ -931,8 +931,37 @@ if __name__ == "__main__":
     # Setup
     directory = MultiGroupDirectory()
     
-    # Build tree (simplified for example)
-    # ... (tree building code) ...
+    # Build tree
+    from typing import Dict, Any
+    
+    class TreeNode:
+        def __init__(self, name):
+            self.name = name
+            self.parent = None
+            self.children = []
+    
+    # Create hierarchy nodes
+    company = TreeNode("Company")
+    engg = TreeNode("Engg")
+    backend = TreeNode("Backend")
+    frontend = TreeNode("Frontend")
+    mobile = TreeNode("Mobile")
+    
+    # Link parent-child relationships
+    engg.parent = company
+    backend.parent = engg
+    frontend.parent = engg
+    mobile.parent = engg
+    
+    # Register nodes
+    directory.root = company
+    directory.nodes = {
+        "Company": company,
+        "Engg": engg,
+        "Backend": backend,
+        "Frontend": frontend,
+        "Mobile": mobile
+    }
     
     # Add employees to multiple groups
     directory.add_employee_to_group("Alice", "Backend")
@@ -984,17 +1013,48 @@ import threading
 class ThreadSafeDirectory:
     def __init__(self):
         self.lock = threading.RLock() # Reentrant Lock
-        self.data = {}
+        self.employee_to_group = {}
+        self.group_hierarchy = {}
 
     def find_closest(self, emps):
         with self.lock: # Or read_lock if available
-            # ... perform read ...
-            pass
+            # Perform LCA query on current state
+            paths = []
+            for emp in emps:
+                if emp in self.employee_to_group:
+                    group = self.employee_to_group[emp]
+                    path = self._trace_path_to_root(group)
+                    paths.append(path)
+            
+            # Find common ancestor
+            if not paths:
+                return None
+            return self._find_common_prefix(paths)
 
     def add_employee(self, emp, group):
         with self.lock: # Exclusive write lock
-            # ... perform write ...
-            pass
+            # Update employee-group mapping
+            self.employee_to_group[emp] = group
+            
+            # Update group hierarchy if needed
+            if group not in self.group_hierarchy:
+                self.group_hierarchy[group] = {"parent": None, "children": set()}
+    
+    def _trace_path_to_root(self, group):
+        path = []
+        current = group
+        while current:
+            path.append(current)
+            current = self.group_hierarchy.get(current, {}).get("parent")
+        return path[::-1]
+    
+    def _find_common_prefix(self, paths):
+        if not paths:
+            return None
+        for i in range(min(len(p) for p in paths)):
+            if len(set(p[i] for p in paths)) > 1:
+                return paths[0][i-1] if i > 0 else None
+        return paths[0][-1]
 ```
 
 #### Solution 2: Production (Read-Write Lock)
@@ -1108,8 +1168,45 @@ class DirectorySnapshot:
         self.root = root_copy
     
     def find_closest_group(self, employees):
-        # ... same LCA logic on this snapshot ...
-        pass
+        """Find LCA on this immutable snapshot."""
+        if not employees or not self.nodes:
+            return None
+        
+        # Get paths for all employees
+        paths = []
+        for emp in employees:
+            if emp not in self.nodes:
+                raise ValueError(f"Employee {emp} not found")
+            path = self._get_path_to_root(self.nodes[emp])
+            paths.append(path)
+        
+        # Find common prefix
+        return self._find_common_prefix(paths)
+    
+    def _get_path_to_root(self, node):
+        """Trace path from node to root."""
+        path = []
+        current = node
+        while current:
+            path.append(current.name)
+            current = current.parent
+        return path[::-1]  # Reverse to get root-to-node
+    
+    def _find_common_prefix(self, paths):
+        """Find the last common element in all paths."""
+        if not paths:
+            return None
+        
+        lca = None
+        min_len = min(len(p) for p in paths)
+        
+        for i in range(min_len):
+            if len(set(p[i] for p in paths)) == 1:
+                lca = paths[0][i]
+            else:
+                break
+        
+        return lca
 
 class COWDirectory:
     """
@@ -1151,7 +1248,20 @@ class COWDirectory:
             new_root = deepcopy(self.current_snapshot.root)
             
             # 2. Make modifications on the copy
-            # ... add employee to new_nodes ...
+            if group_name not in new_nodes:
+                raise ValueError(f"Group {group_name} not found")
+            
+            # Create new employee node
+            class TreeNode:
+                def __init__(self, name):
+                    self.name = name
+                    self.parent = None
+                    self.children = []
+            
+            emp_node = TreeNode(emp_name)
+            emp_node.parent = new_nodes[group_name]
+            new_nodes[group_name].children.append(emp_node)
+            new_nodes[emp_name] = emp_node
             
             # 3. Create new snapshot
             new_snapshot = DirectorySnapshot(new_nodes, new_root)

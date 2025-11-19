@@ -731,8 +731,31 @@ def move(self, direction: str) -> int:
     # if (new_head_row < 0 or new_head_row >= self.height or ...):
     #     return -1
     
-    # 3-7. Rest remains the same
-    # ... (food check, tail removal, collision check, etc.)
+    # 3. Check if snake eats food
+    ate_food = False
+    if self.food_index < len(self.food):
+        next_food = tuple(self.food[self.food_index])
+        if new_head == next_food:
+            self.food_index += 1
+            ate_food = True
+    
+    # 4. Add new head to snake
+    self.snake.append(new_head)
+    
+    # 5. Remove tail if no food eaten
+    if not ate_food:
+        tail = self.snake.popleft()
+        self.occupied.remove(tail)
+    
+    # 6. Check collision with itself
+    if new_head in self.occupied:
+        return -1
+    
+    # 7. Mark new head as occupied
+    self.occupied.add(new_head)
+    
+    # 8. Return current score
+    return len(self.snake) - 1
 ```
 
 **Explanation:**

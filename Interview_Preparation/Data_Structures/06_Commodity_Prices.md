@@ -710,28 +710,120 @@ if __name__ == "__main__":
 > "Extend the system to support `getMaxInRange(start_ts, end_ts)` which returns the max price in the timestamp range `[start_ts, end_ts]`."
 
 **Solution:**
-Use the Segment Tree approach from Approach 2, but query a range instead of prefix.
+Use a Segment Tree to support range queries efficiently.
 
 ```python
-def getMaxInRange(self, start_ts: int, end_ts: int) -> Optional[int]:
+class CommodityTrackerWithRange:
     """
-    Get max price in range [start_ts, end_ts].
+    Commodity price tracker with range query support using Segment Tree.
     """
-    if not self.sorted_timestamps:
-        return None
     
-    # Find compressed indices
-    left_idx = bisect.bisect_left(self.sorted_timestamps, start_ts)
-    right_idx = bisect.bisect_right(self.sorted_timestamps, end_ts) - 1
+    def __init__(self):
+        self.data = []  # (timestamp, price)
+        self.segment_tree = []
+        self.dirty = False
     
-    if left_idx > right_idx or right_idx < 0:
-        return None
+    def update(self, timestamp: int, price: int) -> None:
+        """Add or update price at timestamp."""
+        idx = bisect.bisect_left([t for t, p in self.data], timestamp)
+        
+        if idx < len(self.data) and self.data[idx][0] == timestamp:
+            self.data[idx] = (timestamp, price)
+        else:
+            self.data.insert(idx, (timestamp, price))
+        
+        self.dirty = True
     
-    # Query segment tree for range [left_idx, right_idx]
-    return self._query_tree(left_idx, right_idx)
+    def _build_segment_tree(self):
+        """Build segment tree for max queries."""
+        n = len(self.data)
+        if n == 0:
+            return
+        
+        # Segment tree size: 4 * n
+        self.segment_tree = [float('-inf')] * (4 * n)
+        self._build_tree(0, 0, n - 1)
+        self.dirty = False
+    
+    def _build_tree(self, node: int, start: int, end: int):
+        """Recursively build segment tree."""
+        if start == end:
+            # Leaf node
+            self.segment_tree[node] = self.data[start][1]
+            return
+        
+        mid = (start + end) // 2
+        left_child = 2 * node + 1
+        right_child = 2 * node + 2
+        
+        self._build_tree(left_child, start, mid)
+        self._build_tree(right_child, mid + 1, end)
+        
+        self.segment_tree[node] = max(
+            self.segment_tree[left_child],
+            self.segment_tree[right_child]
+        )
+    
+    def _query_tree(self, node: int, start: int, end: int, 
+                    query_start: int, query_end: int) -> int:
+        """Query max in range [query_start, query_end]."""
+        if query_start > end or query_end < start:
+            # No overlap
+            return float('-inf')
+        
+        if query_start <= start and end <= query_end:
+            # Complete overlap
+            return self.segment_tree[node]
+        
+        # Partial overlap
+        mid = (start + end) // 2
+        left_child = 2 * node + 1
+        right_child = 2 * node + 2
+        
+        left_max = self._query_tree(left_child, start, mid, query_start, query_end)
+        right_max = self._query_tree(right_child, mid + 1, end, query_start, query_end)
+        
+        return max(left_max, right_max)
+    
+    def getMaxInRange(self, start_ts: int, end_ts: int) -> Optional[int]:
+        """
+        Get max price in range [start_ts, end_ts].
+        
+        Time: O(log N)
+        """
+        if not self.data:
+            return None
+        
+        if self.dirty:
+            self._build_segment_tree()
+        
+        # Find compressed indices
+        timestamps = [t for t, p in self.data]
+        left_idx = bisect.bisect_left(timestamps, start_ts)
+        right_idx = bisect.bisect_right(timestamps, end_ts) - 1
+        
+        if left_idx > right_idx or right_idx < 0 or left_idx >= len(self.data):
+            return None
+        
+        # Query segment tree
+        result = self._query_tree(0, 0, len(self.data) - 1, left_idx, right_idx)
+        return result if result != float('-inf') else None
+
+
+# Example Usage
+if __name__ == "__main__":
+    tracker = CommodityTrackerWithRange()
+    
+    tracker.update(1, 100)
+    tracker.update(5, 300)
+    tracker.update(10, 150)
+    
+    print(f"Max in range [1, 5]: {tracker.getMaxInRange(1, 5)}")    # 300
+    print(f"Max in range [5, 10]: {tracker.getMaxInRange(5, 10)}")  # 300
+    print(f"Max in range [6, 10]: {tracker.getMaxInRange(6, 10)}")  # 150
 ```
 
-**Complexity:** O(log N) with Segment Tree.
+**Complexity:** O(log N) for range queries, O(N) for rebuilds (amortized over multiple queries).
 
 ---
 
