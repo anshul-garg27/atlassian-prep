@@ -356,6 +356,135 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the file aggregation algorithm step by step:
+
+**Files:**
+```python
+[
+    {"name": "file1.txt", "size": 100, "collectionId": "photos"},
+    {"name": "file2.txt", "size": 200, "collectionId": "photos"},
+    {"name": "file3.txt", "size": 300, "collectionId": "docs"},
+    {"name": "file4.txt", "size": 150, "collectionId": "docs"},
+    {"name": "file5.txt", "size": 50, "collectionId": null}
+]
+```
+
+**Goal:** Total size + Top 2 collections
+
+---
+
+**Step 1: Initialize Accumulators**
+
+```python
+total_size = 0
+collection_sizes = defaultdict(int)
+```
+
+---
+
+**Step 2: Aggregate (Single Pass)**
+
+**Process file1:**
+```python
+size = 100
+collectionId = "photos"
+
+total_size += 100  # total_size = 100
+collection_sizes["photos"] += 100  # {"photos": 100}
+```
+
+**Process file2:**
+```python
+size = 200
+collectionId = "photos"
+
+total_size += 200  # total_size = 300
+collection_sizes["photos"] += 200  # {"photos": 300}
+```
+
+**Process file3:**
+```python
+size = 300
+collectionId = "docs"
+
+total_size += 300  # total_size = 600
+collection_sizes["docs"] += 300  # {"photos": 300, "docs": 300}
+```
+
+**Process file4:**
+```python
+size = 150
+collectionId = "docs"
+
+total_size += 150  # total_size = 750
+collection_sizes["docs"] += 150  # {"photos": 300, "docs": 450}
+```
+
+**Process file5:**
+```python
+size = 50
+collectionId = null
+
+total_size += 50  # total_size = 800
+# Don't add to collection_sizes (null collection)
+```
+
+---
+
+**After Aggregation:**
+
+```python
+total_size = 800
+collection_sizes = {
+    "photos": 300,
+    "docs": 450
+}
+```
+
+---
+
+**Step 3: Extract Top K (K=2)**
+
+Using `heapq.nlargest()`:
+
+```python
+top_k = heapq.nlargest(2, collection_sizes.items(), key=lambda x: x[1])
+
+# Internal process:
+# Items: [("photos", 300), ("docs", 450)]
+# Sort by size (descending): [("docs", 450), ("photos", 300)]
+# Take first 2: [("docs", 450), ("photos", 300)]
+```
+
+**Result:**
+```python
+top_collections = [("docs", 450), ("photos", 300)]
+```
+
+---
+
+**Final Report:**
+
+```python
+{
+    "total_size": 800,
+    "top_collections": [("docs", 450), ("photos", 300)]
+}
+```
+
+---
+
+**Key Observations:**
+
+1. **Single pass aggregation** is O(N)
+2. **Null collections** counted in total but excluded from Top K
+3. **Heap extraction** is O(C log K) where C = collections
+4. **Efficient for K << C** (e.g., Top 10 from 10,000 collections)
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity

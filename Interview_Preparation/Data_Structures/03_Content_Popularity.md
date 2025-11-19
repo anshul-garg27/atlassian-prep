@@ -310,6 +310,120 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through a detailed example step by step to understand how the algorithm works:
+
+**Operations:**
+1. `increasePopularity("A")`  
+2. `increasePopularity("B")`  
+3. `increasePopularity("B")`  
+4. `mostPopular()`  
+5. `increasePopularity("A")`  
+6. `decreasePopularity("B")`
+
+---
+
+**Initial State:**
+```
+key_to_node = {}
+DLL: [Head] <-> [Tail]
+```
+
+---
+
+**Operation 1: increasePopularity("A")**
+
+- A is new (not in `key_to_node`)
+- Need bucket for count=1
+- Check `head.next`: Is it count=1? No (it's Tail)
+- Create new bucket for count=1 after Head
+- Add A to this bucket
+
+```
+key_to_node = {A: Node(count=1)}
+DLL: [Head] <-> [count=1: {A}] <-> [Tail]
+```
+
+---
+
+**Operation 2: increasePopularity("B")**
+
+- B is new (not in `key_to_node`)
+- Need bucket for count=1
+- Check `head.next`: Is it count=1? Yes! Use existing bucket
+- Add B to this bucket
+
+```
+key_to_node = {A: Node(count=1), B: Node(count=1)}
+DLL: [Head] <-> [count=1: {A, B}] <-> [Tail]
+```
+
+---
+
+**Operation 3: increasePopularity("B")**
+
+- B exists at count=1
+- Need to move to count=2
+- current_node = Node(count=1)
+- Check current_node.next: Is it count=2? No (it's Tail)
+- Create new bucket for count=2 after current_node
+- Move B from count=1 bucket to count=2 bucket
+- count=1 bucket still has A, so don't remove it
+
+```
+key_to_node = {A: Node(count=1), B: Node(count=2)}
+DLL: [Head] <-> [count=1: {A}] <-> [count=2: {B}] <-> [Tail]
+```
+
+---
+
+**Operation 4: mostPopular()**
+
+- Look at `tail.prev`
+- tail.prev = Node(count=2)
+- Return any key from this bucket: "B"
+
+**Result:** "B"
+
+---
+
+**Operation 5: increasePopularity("A")**
+
+- A exists at count=1
+- Need to move to count=2
+- current_node = Node(count=1)
+- Check current_node.next: Is it count=2? Yes! Use existing bucket
+- Move A from count=1 bucket to count=2 bucket
+- count=1 bucket is now empty → remove it from DLL
+
+```
+key_to_node = {A: Node(count=2), B: Node(count=2)}
+DLL: [Head] <-> [count=2: {A, B}] <-> [Tail]
+```
+
+---
+
+**Operation 6: decreasePopularity("B")**
+
+- B exists at count=2
+- Need to move to count=1
+- current_node = Node(count=2)
+- Remove B from count=2 bucket
+- Check current_node.prev: Is it count=1? No (it's Head)
+- Create new bucket for count=1 after Head (before count=2)
+- Add B to count=1 bucket
+- count=2 bucket still has A, so don't remove it
+
+```
+key_to_node = {A: Node(count=2), B: Node(count=1)}
+DLL: [Head] <-> [count=1: {B}] <-> [count=2: {A}] <-> [Tail]
+```
+
+**Final State:** A has count=2 (most popular), B has count=1
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity: **O(1)** for all operations

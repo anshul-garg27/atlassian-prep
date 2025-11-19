@@ -501,6 +501,140 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through finding the closest common group for **["Alice", "Lisa"]**:
+
+**Org Hierarchy:**
+```text
+                    Company (Root)
+                   /      |      \
+              Engg       HR      Sales
+             /  |  \
+     Backend Frontend Mobile
+      /  \       |
+  Alice  Bob   Lisa
+```
+
+---
+
+**Step 1: Build Tree and HashMap**
+
+```python
+nodes = {
+    "Company": Node("Company", parent=None),
+    "Engg": Node("Engg", parent=Company),
+    "Backend": Node("Backend", parent=Engg),
+    "Alice": Node("Alice", parent=Backend),
+    "Frontend": Node("Frontend", parent=Engg),
+    "Lisa": Node("Lisa", parent=Frontend),
+    ...
+}
+```
+
+---
+
+**Step 2: Get Path for Alice**
+
+Trace from Alice to root following parent pointers:
+
+```python
+path = []
+current = nodes["Alice"]
+
+# Step 1: Alice
+path.append("Alice")
+current = current.parent  # Backend
+
+# Step 2: Backend
+path.append("Backend")
+current = current.parent  # Engg
+
+# Step 3: Engg
+path.append("Engg")
+current = current.parent  # Company
+
+# Step 4: Company
+path.append("Company")
+current = current.parent  # None (root)
+
+# Reverse to get root → leaf
+path.reverse()
+```
+
+**Alice's path:** `["Company", "Engg", "Backend", "Alice"]`
+
+---
+
+**Step 3: Get Path for Lisa**
+
+```python
+# Following same process:
+path = ["Lisa", "Frontend", "Engg", "Company"]
+path.reverse()
+```
+
+**Lisa's path:** `["Company", "Engg", "Frontend", "Lisa"]`
+
+---
+
+**Step 4: Find Common Prefix**
+
+Compare paths element by element:
+
+```text
+Alice: ["Company", "Engg", "Backend", "Alice"]
+        Index 0    Index 1  Index 2   Index 3
+
+Lisa:  ["Company", "Engg", "Frontend", "Lisa"]
+        Index 0    Index 1  Index 2    Index 3
+
+Comparison:
+- Index 0: "Company" == "Company" ✓
+- Index 1: "Engg" == "Engg" ✓
+- Index 2: "Backend" != "Frontend" ✗ STOP!
+
+Last common index: 1
+```
+
+**Last Common Ancestor:** `"Engg"`
+
+---
+
+**Step 5: Handle Edge Case**
+
+```python
+lca = "Engg"
+
+# Check if LCA is an employee (it's not)
+if lca in ["Alice", "Lisa"]:
+    return lca.parent  # But "Engg" is a group, not employee
+
+return "Engg"  ✓
+```
+
+**Answer:** **"Engg"** (Engineering department)
+
+---
+
+**Visual Trace:**
+
+```text
+Paths laid side by side:
+
+Company ──┬── Engg ──┬── Backend ── Alice
+          │          │
+          │          └── Frontend ── Lisa
+          │
+          └── HR ── Charlie
+
+Common path: Company → Engg
+Divergence at: Backend vs Frontend
+LCA: Engg ✓
+```
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity: **O(K × H)**

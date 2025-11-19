@@ -18,6 +18,11 @@
           "name": "Atlassian",
           "slug": "atlassian",
           "tagType": "COMPANY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -271,11 +276,6 @@
           "name": "Atlassian",
           "slug": "atlassian",
           "tagType": "COMPANY"
-        },
-        {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
         }
       ],
       "topic": {
@@ -578,6 +578,16 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -794,6 +804,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -945,11 +970,6 @@
           "tagType": null
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "interview question",
           "slug": "interview-question",
           "tagType": null
@@ -1005,6 +1025,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1124,6 +1159,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1176,6 +1226,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1285,6 +1340,11 @@
           "name": "Atlassian",
           "slug": "atlassian",
           "tagType": "COMPANY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1358,6 +1418,11 @@
           "name": "Atlassian",
           "slug": "atlassian",
           "tagType": "COMPANY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1456,6 +1521,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1585,6 +1655,16 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -1714,6 +1794,21 @@
           "name": "interview experience",
           "slug": "interview-experience",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2080,6 +2175,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2178,6 +2288,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2282,6 +2407,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2596,6 +2736,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2648,6 +2803,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2715,6 +2885,21 @@
           "name": "System Design for Interviews and Beyond",
           "slug": "system-design-for-interviews-and-beyond",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2808,6 +2993,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2891,6 +3091,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -2984,6 +3199,21 @@
           "name": "Atlassian",
           "slug": "atlassian",
           "tagType": "COMPANY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3178,14 +3408,24 @@
           "tagType": "COMPANY"
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3214,14 +3454,24 @@
           "tagType": null
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3245,14 +3495,24 @@
           "tagType": "COMPANY"
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3341,6 +3601,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3527,6 +3802,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -3951,6 +4241,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4086,6 +4391,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4226,11 +4546,6 @@
           "tagType": null
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
@@ -4337,11 +4652,6 @@
         {
           "name": "System Design",
           "slug": "system-design",
-          "tagType": null
-        },
-        {
-          "name": "DSA",
-          "slug": "dsa",
           "tagType": null
         },
         {
@@ -4534,6 +4844,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4596,6 +4921,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4622,6 +4962,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4809,6 +5164,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -4992,14 +5362,24 @@
           "tagType": "TOPIC"
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5036,6 +5416,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5124,6 +5519,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5285,6 +5685,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5337,6 +5752,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5844,6 +6264,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -5967,6 +6402,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -6168,6 +6608,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -7032,6 +7487,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -7222,6 +7682,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -7439,6 +7914,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -7930,11 +8420,6 @@
           "tagType": "COMPANY"
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
@@ -8347,11 +8832,6 @@
           "tagType": null
         },
         {
-          "name": "DSA",
-          "slug": "dsa",
-          "tagType": null
-        },
-        {
           "name": "Interview",
           "slug": "interview",
           "tagType": null
@@ -8505,6 +8985,16 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -8530,11 +9020,6 @@
         {
           "name": "Online Assessment",
           "slug": "online-assessment",
-          "tagType": null
-        },
-        {
-          "name": "DSA",
-          "slug": "dsa",
           "tagType": null
         },
         {
@@ -10059,6 +10544,11 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -10183,6 +10673,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -10431,6 +10936,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -10915,6 +11435,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -10956,6 +11491,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {
@@ -12012,6 +12562,21 @@
           "name": "Interview",
           "slug": "interview",
           "tagType": null
+        },
+        {
+          "name": "DSA",
+          "slug": "dsa",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "HLD",
+          "slug": "hld",
+          "tagType": "CATEGORY"
+        },
+        {
+          "name": "LLD",
+          "slug": "lld",
+          "tagType": "CATEGORY"
         }
       ],
       "topic": {

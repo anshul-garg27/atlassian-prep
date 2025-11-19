@@ -388,6 +388,132 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the inventory management system with a concrete example:
+
+**Initial Inventory:** `["wheel", "wheel", "wheel", "motor", "sensor", "sensor"]`
+
+**Requirements:** `["wheel", "wheel", "motor"]`
+
+---
+
+**Step 1: Initialize Builder**
+
+```python
+builder = RobotBuilder(["wheel", "wheel", "wheel", "motor", "sensor", "sensor"])
+
+# Internal state:
+inventory = Counter({
+    "wheel": 3,
+    "motor": 1,
+    "sensor": 2
+})
+```
+
+---
+
+**Step 2: Check if Can Build**
+
+```python
+requirements = ["wheel", "wheel", "motor"]
+req_count = Counter(requirements)
+# Result: {"wheel": 2, "motor": 1}
+```
+
+**Validation:**
+```text
+Check "wheel": need 2, have 3 ✓
+Check "motor": need 1, have 1 ✓
+
+All requirements satisfied!
+```
+
+**Result:** `can_build() = True`
+
+---
+
+**Step 3: Build Robot (Consume Parts)**
+
+Since validation passed, consume parts atomically:
+
+```python
+for part, needed in req_count.items():
+    inventory[part] -= needed
+```
+
+**Updates:**
+```text
+wheel: 3 - 2 = 1
+motor: 1 - 1 = 0
+```
+
+**New Inventory State:**
+```python
+inventory = Counter({
+    "wheel": 1,
+    "motor": 0,  # Will be removed (0 count)
+    "sensor": 2
+})
+
+# After cleanup (remove zero counts):
+inventory = Counter({
+    "wheel": 1,
+    "sensor": 2
+})
+```
+
+**Result:** `build() = (True, "Success")`
+
+---
+
+**Example 2: Insufficient Parts**
+
+Now try to build another robot needing `["wheel", "wheel", "motor"]`:
+
+**Current Inventory:** `{"wheel": 1, "sensor": 2}`
+
+**Validation:**
+```text
+Check "wheel": need 2, have 1 ✗ MISSING!
+Check "motor": need 1, have 0 ✗ MISSING!
+```
+
+**Missing Parts Calculation:**
+```python
+missing = {
+    "wheel": 2 - 1 = 1,
+    "motor": 1 - 0 = 1
+}
+```
+
+**Result:** 
+```python
+build() = (
+    False, 
+    {"wheel": "need 1 more", "motor": "need 1 more"}
+)
+```
+
+**Inventory Unchanged** (atomic transaction failed):
+```python
+inventory = Counter({
+    "wheel": 1,
+    "sensor": 2
+})
+```
+
+---
+
+**Key Points:**
+
+1. **Counter** provides O(1) lookup and updates
+2. **Validation happens before modification** (atomic)
+3. **Missing parts are calculated** for user feedback
+4. **Transaction either fully succeeds or fails** (no partial builds)
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity

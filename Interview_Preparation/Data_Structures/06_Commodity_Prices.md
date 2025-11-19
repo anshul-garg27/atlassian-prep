@@ -337,6 +337,141 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the prefix maximum query algorithm:
+
+**Updates:** (timestamp, price)
+- `update(5, 100)`
+- `update(10, 150)`
+- `update(3, 200)` ← Out of order!
+- `update(7, 120)`
+
+**Query:** `getMaxPrice(7)` → Find max price for all timestamps ≤ 7
+
+---
+
+**Step 1: Process Updates**
+
+**After update(5, 100):**
+```python
+data = [(5, 100)]
+prefix_max = [100]
+dirty = False
+```
+
+**After update(10, 150):**
+```python
+data = [(5, 100), (10, 150)]
+prefix_max = [100, 150]
+```
+
+**After update(3, 200):** ← Out of order!
+```python
+# Binary search for insertion position
+# 3 < 5, so insert at index 0
+
+data = [(3, 200), (5, 100), (10, 150)]
+dirty = True  # Prefix max needs rebuild
+```
+
+**After update(7, 120):**
+```python
+# Binary search: 7 goes between 5 and 10
+
+data = [(3, 200), (5, 100), (7, 120), (10, 150)]
+dirty = True
+```
+
+---
+
+**Step 2: Query getMaxPrice(7)**
+
+**Check if dirty:**
+```python
+if dirty:
+    _rebuild_prefix_max()
+```
+
+**Rebuild prefix_max:**
+```python
+prices = [200, 100, 120, 150]
+
+prefix_max = []
+current_max = 0
+
+# Index 0: max(0, 200) = 200
+prefix_max.append(200)  # [200]
+
+# Index 1: max(200, 100) = 200
+prefix_max.append(200)  # [200, 200]
+
+# Index 2: max(200, 120) = 200
+prefix_max.append(200)  # [200, 200, 200]
+
+# Index 3: max(200, 150) = 200
+prefix_max.append(200)  # [200, 200, 200, 200]
+
+dirty = False
+```
+
+---
+
+**Step 3: Binary Search for Timestamp ≤ 7**
+
+```python
+# Find largest timestamp ≤ 7
+# data = [(3, 200), (5, 100), (7, 120), (10, 150)]
+#         idx=0      idx=1      idx=2      idx=3
+
+# Binary search finds: index 2 (timestamp=7)
+```
+
+---
+
+**Step 4: Return Prefix Max**
+
+```python
+return prefix_max[2]  # Returns 200
+```
+
+**Answer:** Max price for timestamps ≤ 7 is **200** (from timestamp 3)
+
+---
+
+**Visual Representation:**
+
+```text
+Timeline: 0───3───5───7───10───>
+Prices:      200  100  120  150
+
+Query getMaxPrice(7):
+- Look at timestamps: 3, 5, 7
+- Prices: 200, 100, 120
+- Maximum: 200 ✓
+
+Query getMaxPrice(10):
+- Look at all timestamps: 3, 5, 7, 10
+- Prices: 200, 100, 120, 150
+- Maximum: 200 ✓
+
+Query getMaxPrice(4):
+- Look at timestamps: 3
+- Prices: 200
+- Maximum: 200 ✓
+```
+
+---
+
+**Key Observations:**
+
+1. **Out-of-order updates** trigger prefix max rebuild
+2. **Binary search** finds the right position in O(log N)
+3. **Prefix max array** enables O(1) query after rebuild
+4. **Lazy rebuild** only happens when querying (read-optimized)
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Approach 1: Prefix Max Cache

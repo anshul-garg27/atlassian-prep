@@ -346,6 +346,97 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through how the vote counting algorithm works with a concrete example:
+
+**Votes:** `["Alice", "Bob", "Alice", "Charlie", "Bob", "Bob", "Alice"]`
+
+**Goal:** Find the winner with tie-breaking rule = "alphabetically last"
+
+---
+
+**Step 1: Count Votes (O(N))**
+
+Iterate through each vote and build frequency map:
+
+```python
+votes = ["Alice", "Bob", "Alice", "Charlie", "Bob", "Bob", "Alice"]
+
+# Using Counter
+counts = Counter(votes)
+```
+
+**Result:**
+```
+counts = {
+    "Alice": 3,
+    "Bob": 3,
+    "Charlie": 1
+}
+```
+
+---
+
+**Step 2: Find Maximum Count (O(C))**
+
+```python
+max_count = max(counts.values())  # max(3, 3, 1) = 3
+```
+
+**Result:** `max_count = 3`
+
+---
+
+**Step 3: Find All Winners with Max Count**
+
+```python
+winners = [name for name, count in counts.items() if count == max_count]
+```
+
+**Result:** `winners = ["Alice", "Bob"]` (both have 3 votes)
+
+---
+
+**Step 4: Apply Tie-Breaking Rule**
+
+Since we have a tie, apply the rule "alphabetically last":
+
+```python
+if tie_rule == "alphabetical_last":
+    winner = max(winners)  # max("Alice", "Bob") = "Bob"
+```
+
+**Comparison:** "Bob" > "Alice" alphabetically → **Bob wins!**
+
+---
+
+**Alternative: Top K Leaderboard**
+
+If we want Top 2 candidates:
+
+**Step 1:** Sort all candidates by count (descending), then by name (ascending for ties):
+
+```python
+sorted_candidates = sorted(
+    counts.items(),
+    key=lambda x: (-x[1], x[0])
+)
+
+# Result:
+# [("Alice", 3), ("Bob", 3), ("Charlie", 1)]
+# Both Alice and Bob have 3, but Alice < Bob alphabetically
+```
+
+**Step 2:** Take first k:
+
+```python
+top_2 = sorted_candidates[:2]
+# Result: [("Alice", 3), ("Bob", 3)]
+```
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity

@@ -381,6 +381,131 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through how the Trie-based router works with a concrete example:
+
+**Routes Added:**
+1. `/api/users` → "GetUsers"
+2. `/api/*/profile` → "GetProfile"
+3. `/users/admin` → "AdminHandler"
+
+**Query:** `/api/users`
+
+---
+
+**Step 1: Build Trie**
+
+After adding all routes, the Trie looks like:
+
+```text
+root
+ ├─ api
+ │   ├─ users ────→ [handler: "GetUsers"]
+ │   └─ * ────→ profile ────→ [handler: "GetProfile"]
+ └─ users
+     └─ admin ────→ [handler: "AdminHandler"]
+```
+
+---
+
+**Step 2: Query `/api/users`**
+
+Split path into segments: `["api", "users"]`
+
+**DFS Traversal:**
+
+```text
+_dfs(root, ["api", "users"], index=0):
+  segment = "api"
+  
+  Try exact match: root.children["api"]? YES ✓
+    → Recurse: _dfs(api_node, ["api", "users"], index=1)
+    
+      segment = "users"
+      
+      Try exact match: api_node.children["users"]? YES ✓
+        → Recurse: _dfs(users_node, ["api", "users"], index=2)
+        
+          index=2 == len(segments)=2 → BASE CASE
+          Return users_node.handler = "GetUsers" ✓
+```
+
+**Result:** "GetUsers"
+
+---
+
+**Query 2:** `/api/john/profile`
+
+Split path: `["api", "john", "profile"]`
+
+**DFS Traversal:**
+
+```text
+_dfs(root, ["api", "john", "profile"], index=0):
+  segment = "api"
+  
+  Try exact: root.children["api"]? YES ✓
+    → _dfs(api_node, segments, index=1)
+    
+      segment = "john"
+      
+      Try exact: api_node.children["john"]? NO ✗
+      Try wildcard: api_node.children["*"]? YES ✓
+        → _dfs(wildcard_node, segments, index=2)
+        
+          segment = "profile"
+          
+          Try exact: wildcard_node.children["profile"]? YES ✓
+            → _dfs(profile_node, segments, index=3)
+            
+              index=3 == len(segments)=3 → BASE CASE
+              Return profile_node.handler = "GetProfile" ✓
+```
+
+**Result:** "GetProfile"
+
+---
+
+**Query 3:** `/api/users/settings` (No matching route)
+
+Split path: `["api", "users", "settings"]`
+
+**DFS Traversal:**
+
+```text
+_dfs(root, ["api", "users", "settings"], index=0):
+  segment = "api"
+  
+  Try exact: root.children["api"]? YES ✓
+    → _dfs(api_node, segments, index=1)
+    
+      segment = "users"
+      
+      Try exact: api_node.children["users"]? YES ✓
+        → _dfs(users_node, segments, index=2)
+        
+          segment = "settings"
+          
+          Try exact: users_node.children["settings"]? NO ✗
+          Try wildcard: users_node.children["*"]? NO ✗
+          
+          Return None ✗
+```
+
+**Result:** None (no matching route)
+
+---
+
+**Key Observations:**
+
+1. **Exact match is tried first** (priority)
+2. **Wildcard is fallback** when exact fails
+3. **DFS explores all possible paths** via backtracking
+4. **Handler is returned only at leaf nodes** (end of path)
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity

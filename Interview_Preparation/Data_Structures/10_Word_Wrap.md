@@ -318,6 +318,156 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the text justification algorithm step by step:
+
+**Words:** `["This", "is", "an", "example", "of", "text"]`  
+**maxWidth:** `16`
+
+---
+
+**Step 1: Pack Line 1 - Greedy Packing**
+
+Start with index i=0:
+
+```python
+line_words = []
+line_length = 0
+
+Try "This": len=4
+  line_length = 4
+  line_words = ["This"]
+
+Try "is": len=2
+  Need 1 space + 2 chars = 3 more
+  line_length + 3 = 7 ≤ 16 ✓
+  line_words = ["This", "is"]
+
+Try "an": len=2
+  Need 1 space + 2 chars = 3 more
+  line_length + 3 = 10 ≤ 16 ✓
+  line_words = ["This", "is", "an"]
+
+Try "example": len=7
+  Need 1 space + 7 chars = 8 more
+  line_length + 8 = 18 > 16 ✗ STOP!
+```
+
+**Line 1 words:** `["This", "is", "an"]`
+
+---
+
+**Step 2: Format Line 1 - Space Distribution**
+
+```python
+num_words = 3
+total_word_length = 4 + 2 + 2 = 8
+total_spaces = 16 - 8 = 8
+gaps = 3 - 1 = 2
+
+base_spaces = 8 // 2 = 4
+extra_spaces = 8 % 2 = 0
+
+Space distribution: [4, 4]
+```
+
+**Build line:**
+```text
+"This" + (4 spaces) + "is" + (4 spaces) + "an"
+= "This    is    an"
+```
+
+**Verification:** Length = 4 + 4 + 2 + 4 + 2 = 16 ✓
+
+---
+
+**Step 3: Pack Line 2**
+
+Continue from "example":
+
+```python
+Try "example": len=7
+  line_length = 7
+  line_words = ["example"]
+
+Try "of": len=2
+  7 + 1 + 2 = 10 ≤ 16 ✓
+  line_words = ["example", "of"]
+
+Try "text": len=4
+  10 + 1 + 4 = 15 ≤ 16 ✓
+  line_words = ["example", "of", "text"]
+
+End of words array.
+```
+
+**Line 2 words:** `["example", "of", "text"]`
+
+---
+
+**Step 4: Format Line 2 - Last Line (Left-Justify)**
+
+```python
+is_last_line = True
+
+# Left-justify: single space between words, pad right
+line = "example of text"
+padding = 16 - 15 = 1
+line = "example of text "
+```
+
+**Verification:** Length = 15 + 1 = 16 ✓
+
+---
+
+**Final Result:**
+
+```python
+[
+    "This    is    an",
+    "example of text "
+]
+```
+
+---
+
+**Example 2: Uneven Distribution**
+
+**Words:** `["a", "b", "c"]`, **maxWidth:** `7`
+
+```python
+# All 3 words fit: "a", "b", "c"
+total_word_length = 1 + 1 + 1 = 3
+total_spaces = 7 - 3 = 4
+gaps = 3 - 1 = 2
+
+base_spaces = 4 // 2 = 2
+extra_spaces = 4 % 2 = 0
+
+Space distribution: [2, 2]
+Result: "a  b  c"
+```
+
+**Uneven Example:** `["a", "b", "c", "d"]`, **maxWidth:** `9`
+
+```python
+total_word_length = 4
+total_spaces = 9 - 4 = 5
+gaps = 4 - 1 = 3
+
+base_spaces = 5 // 3 = 1
+extra_spaces = 5 % 3 = 2
+
+# First 2 gaps get +1 extra space (left-heavy)
+Space distribution: [2, 2, 1]
+Result: "a  b  c d"
+         ^^  ^^  ^
+      (gap1) (gap2) (gap3)
+```
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity: **O(N)**

@@ -382,6 +382,121 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the algorithm step by step with a concrete example:
+
+**Bookings:** `[[0, 30], [10, 20], [15, 45], [50, 70]]`
+
+**Goal:** Minimize number of courts needed
+
+---
+
+**Step 1: Sort by Start Time**
+
+```python
+bookings = [[0, 30], [10, 20], [15, 45], [50, 70]]
+# Already sorted by start time!
+```
+
+---
+
+**Step 2: Initialize Min-Heap**
+
+```python
+heap = []  # Will store end times of courts
+courts_needed = 0
+```
+
+---
+
+**Step 3: Process Each Booking**
+
+**Booking 1: [0, 30]**
+- Heap is empty
+- Need a new court
+- Assign to Court 1, ends at 30
+- Push 30 to heap
+
+```
+heap = [30]
+courts_needed = 1
+Timeline: Court 1: [0────────30]
+```
+
+---
+
+**Booking 2: [10, 20]**
+- Heap top = 30 (Court 1 busy until 30)
+- Booking starts at 10 < 30 → Court 1 not available
+- Need a new court
+- Assign to Court 2, ends at 20
+- Push 20 to heap
+
+```
+heap = [20, 30]  (min-heap)
+courts_needed = 2
+Timeline: 
+  Court 1: [0────────30]
+  Court 2:      [10──20]
+```
+
+---
+
+**Booking 3: [15, 45]**
+- Heap top = 20 (Court 2 free at 20)
+- Booking starts at 15 < 20 → Court 2 not available yet
+- Need a new court
+- Assign to Court 3, ends at 45
+- Push 45 to heap
+
+```
+heap = [20, 30, 45]
+courts_needed = 3
+Timeline:
+  Court 1: [0────────30]
+  Court 2:      [10──20]
+  Court 3:           [15───────45]
+```
+
+---
+
+**Booking 4: [50, 70]**
+- Heap top = 20 (Court 2 free at 20)
+- Booking starts at 50 > 20 → Court 2 is available!
+- **Reuse Court 2**
+- Pop 20 from heap, push 70
+
+```
+heap = [30, 45, 70]
+courts_needed = 3 (no new court needed)
+Timeline:
+  Court 1: [0────────30]
+  Court 2:      [10──20]                     [50──70]
+  Court 3:           [15───────45]
+```
+
+---
+
+**Final Answer: 3 courts needed**
+
+The heap size (or max heap size) gives us the answer: **3 courts**
+
+---
+
+**Visual Timeline:**
+
+```text
+Time:    0────10───15──20───30────45──50──70
+Court 1: █████████████████████████
+Court 2:      ██████████                ████████
+Court 3:           ████████████████████████
+                   
+Peak overlap at t=15: 3 courts in use simultaneously
+```
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Greedy with Min-Heap Approach
