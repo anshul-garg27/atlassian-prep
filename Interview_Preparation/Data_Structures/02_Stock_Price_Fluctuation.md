@@ -404,6 +404,140 @@ if __name__ == "__main__":
 
 ---
 
+## 🔍 Explanation with Example
+
+Let's trace through the lazy removal pattern with heaps:
+
+**Operations:**
+1. `update(1, 10)`
+2. `update(2, 5)`
+3. `update(1, 3)` ← Correction!
+4. `maximum()`
+
+---
+
+**Step 1: update(1, 10)**
+
+```python
+timestamp_to_price = {1: 10}
+latest_timestamp = 1
+
+max_heap = [(-10, 1)]  # Negative for max behavior
+min_heap = [(10, 1)]
+```
+
+---
+
+**Step 2: update(2, 5)**
+
+```python
+timestamp_to_price = {1: 10, 2: 5}
+latest_timestamp = 2
+
+max_heap = [(-10, 1), (-5, 2)]
+min_heap = [(5, 2), (10, 1)]
+```
+
+**Note:** We push new entries, don't remove old ones!
+
+---
+
+**Step 3: update(1, 3)** ← Price correction!
+
+```python
+# Update ground truth
+timestamp_to_price = {1: 3, 2: 5}  # 1 → 10 is now 1 → 3
+latest_timestamp = 2
+
+# Push new values (don't remove old)
+max_heap = [(-10, 1), (-5, 2), (-3, 1)]
+#           ^^^^^^^^ STALE!
+
+min_heap = [(3, 1), (5, 2), (10, 1)]
+#                            ^^^^^^^ STALE!
+```
+
+**Key Point:** The old (1, 10) entries are now **stale** but still in heaps!
+
+---
+
+**Step 4: maximum()** ← Query with lazy removal
+
+```python
+while True:
+    # Peek at heap top
+    price, ts = max_heap[0]  # (-10, 1)
+    
+    # Check if valid
+    if timestamp_to_price[ts] == -price:
+        # 10 == -(-10)? → 10 == 10?
+        # But timestamp_to_price[1] = 3, not 10!
+        # STALE ENTRY! Pop it.
+        heappop(max_heap)
+    else:
+        # Continue loop
+        pass
+
+# After popping (-10, 1):
+max_heap = [(-5, 2), (-3, 1)]
+
+# Peek again
+price, ts = max_heap[0]  # (-5, 2)
+
+# Check if valid
+if timestamp_to_price[2] == -(-5):
+    # 5 == 5? YES! ✓
+    return 5
+```
+
+**Answer:** Maximum price is **5**
+
+---
+
+**Visual Representation:**
+
+```text
+Timeline: ──1──2──>
+
+Initial:
+t=1: 10
+t=2: 5
+
+After correction (1 → 3):
+t=1: 3  (was 10)
+t=2: 5
+
+Heaps state:
+max_heap: [10-stale, 5, 3]
+                    ↑
+                  Valid!
+
+When querying maximum():
+1. Check 10 → stale (ground truth says 3) → pop
+2. Check 5 → valid (ground truth says 5) → return ✓
+```
+
+---
+
+**Why Lazy Removal Works:**
+
+```text
+Benefit:
+- Update: O(log N) instead of O(N)
+- Just push new value, don't search for old
+
+Cost:
+- Space: O(updates) instead of O(timestamps)
+- Query: Amortized O(log N) with cleanup
+
+Trade-off: 
+✓ Good for update-heavy workloads
+✓ Amortized cleanup during queries
+✗ Extra space for stale entries
+```
+
+---
+
 ## 🔍 Complexity Analysis
 
 ### Time Complexity
