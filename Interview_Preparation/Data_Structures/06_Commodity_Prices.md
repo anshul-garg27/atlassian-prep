@@ -174,6 +174,215 @@ Our problem has:
 
 ---
 
+## 📝 Solution 0: Ultra-Simplified (Interview-Ready, No Classes)
+
+**Perfect for 20-25 minute interviews!** Simple approach with sorted list.
+
+```python
+import bisect
+from typing import Optional, List, Tuple
+
+# Global state for simplified version
+_data_simple: List[Tuple[int, int]] = []  # [(timestamp, price), ...]
+_prefix_max_simple: List[int] = []
+_dirty_simple = False
+
+def update_simple(timestamp: int, price: int) -> None:
+    """
+    Add or update price at timestamp.
+    
+    Time: O(N) for insertion (O(log N) for search)
+    Space: O(1)
+    """
+    global _data_simple, _dirty_simple
+    
+    # Binary search for position
+    idx = bisect.bisect_left(_data_simple, (timestamp, 0))
+    
+    if idx < len(_data_simple) and _data_simple[idx][0] == timestamp:
+        # Update existing
+        _data_simple[idx] = (timestamp, price)
+    else:
+        # Insert new
+        _data_simple.insert(idx, (timestamp, price))
+    
+    # Mark cache as dirty
+    _dirty_simple = True
+
+
+def get_max_price_simple(timestamp: int) -> Optional[int]:
+    """
+    Get maximum price at or before timestamp.
+    
+    Time: O(log N) if cache hot, O(N) if rebuilding
+    Space: O(1)
+    """
+    global _prefix_max_simple, _dirty_simple
+    
+    # Rebuild cache if needed
+    if _dirty_simple:
+        _rebuild_prefix_max_simple()
+    
+    if not _data_simple:
+        return None
+    
+    # Binary search for rightmost timestamp <= query
+    idx = bisect.bisect_right(_data_simple, (timestamp, float('inf'))) - 1
+    
+    if idx < 0:
+        return None
+    
+    return _prefix_max_simple[idx]
+
+
+def _rebuild_prefix_max_simple() -> None:
+    """
+    Rebuild the prefix max cache.
+    
+    Time: O(N)
+    """
+    global _prefix_max_simple, _dirty_simple
+    
+    if not _data_simple:
+        _prefix_max_simple = []
+        _dirty_simple = False
+        return
+    
+    _prefix_max_simple = []
+    current_max = float('-inf')
+    
+    for ts, price in _data_simple:
+        current_max = max(current_max, price)
+        _prefix_max_simple.append(current_max)
+    
+    _dirty_simple = False
+
+
+def reset_simple() -> None:
+    """Reset global state (useful for testing)."""
+    global _data_simple, _prefix_max_simple, _dirty_simple
+    _data_simple = []
+    _prefix_max_simple = []
+    _dirty_simple = False
+
+
+# --- Runnable Example for Interview ---
+if __name__ == "__main__":
+    print("=" * 60)
+    print("COMMODITY PRICE TRACKER - ULTRA-SIMPLIFIED (NO CLASSES)")
+    print("=" * 60)
+    
+    # Test 1: Sequential updates
+    print("\n[Test 1] Sequential Updates")
+    reset_simple()
+    update_simple(1, 100)
+    update_simple(2, 150)
+    update_simple(3, 120)
+    
+    print(f"Max at t=1: {get_max_price_simple(1)}")  # 100
+    print(f"Max at t=2: {get_max_price_simple(2)}")  # 150
+    print(f"Max at t=3: {get_max_price_simple(3)}")  # 150
+    print(f"Expected: 100, 150, 150")
+    
+    # Test 2: Out-of-order updates
+    print("\n[Test 2] Out-of-Order Updates")
+    reset_simple()
+    update_simple(10, 200)
+    update_simple(5, 300)   # Out of order
+    update_simple(7, 250)
+    
+    print(f"Max at t=5: {get_max_price_simple(5)}")    # 300
+    print(f"Max at t=7: {get_max_price_simple(7)}")    # 300
+    print(f"Max at t=10: {get_max_price_simple(10)}")  # 300
+    print(f"Expected: 300, 300, 300")
+    
+    # Test 3: Price corrections
+    print("\n[Test 3] Price Corrections")
+    reset_simple()
+    update_simple(5, 100)
+    update_simple(10, 150)
+    print(f"Before correction - Max at t=10: {get_max_price_simple(10)}")  # 150
+    
+    update_simple(5, 400)  # Correct price at t=5
+    print(f"After correction - Max at t=10: {get_max_price_simple(10)}")   # 400
+    print(f"Expected: 150, then 400 after correction")
+    
+    # Test 4: Query before any data
+    print("\n[Test 4] Edge Cases")
+    reset_simple()
+    update_simple(10, 100)
+    
+    print(f"Max at t=5 (no data): {get_max_price_simple(5)}")     # None
+    print(f"Max at t=15 (after all): {get_max_price_simple(15)}")  # 100
+    print(f"Expected: None, 100")
+    
+    # Test 5: Sparse timestamps
+    print("\n[Test 5] Sparse Timestamps")
+    reset_simple()
+    update_simple(1, 100)
+    update_simple(1000, 200)
+    update_simple(1000000, 150)
+    
+    print(f"Max at t=500: {get_max_price_simple(500)}")           # 100
+    print(f"Max at t=5000: {get_max_price_simple(5000)}")         # 200
+    print(f"Max at t=2000000: {get_max_price_simple(2000000)}")   # 200
+    print(f"Expected: 100, 200, 200")
+    
+    # Test 6: Visual trace
+    print("\n[Test 6] Visual Trace")
+    reset_simple()
+    
+    print("Adding prices:")
+    updates = [(5, 100), (10, 150), (3, 200), (7, 120)]
+    for ts, price in updates:
+        update_simple(ts, price)
+        print(f"  After update({ts}, {price}):")
+        print(f"    Data: {_data_simple}")
+    
+    print(f"\nPrefix max array: {_prefix_max_simple}")
+    
+    queries = [3, 5, 7, 10]
+    print(f"\nQueries:")
+    for q in queries:
+        result = get_max_price_simple(q)
+        print(f"  Max at t={q}: {result}")
+    
+    print(f"\nExpected: 200, 200, 200, 200 (t=3 has highest price)")
+    
+    # Test 7: Empty state
+    print("\n[Test 7] Empty State")
+    reset_simple()
+    print(f"Max at t=100 (no data): {get_max_price_simple(100)}")
+    print(f"Expected: None")
+
+    print("\n" + "=" * 60)
+    print("Ultra-Simplified tests passed! ✓")
+    print("=" * 60)
+    print("\n💡 Key Points:")
+    print("  • Sorted list + binary search: O(log N) query")
+    print("  • Prefix max cache for fast lookups")
+    print("  • Lazy rebuild on first query after update")
+    print("  • Can write in 20-25 minutes")
+    print("\n⚠️  Trade-off:")
+    print("  • O(N) insertion (list.insert)")
+    print("  • Good for read-heavy workloads")
+    print("  • For write-heavy, use Segment Tree below")
+```
+
+**Why This Is Perfect for Interviews:**
+- ✅ **No classes** - Just functions and lists
+- ✅ **20-25 minutes** - Can write from scratch
+- ✅ **Standard library** - Just bisect module
+- ✅ **Easy to explain** - Sorted list + prefix max
+- ✅ **Correct complexity** - O(log N) query (when cache hot)
+
+**When to Use Segment Tree (Production Solution Below):**
+- Write-heavy workload (many updates)
+- Need predictable O(log N) for both operations
+- Working with very large datasets
+
+---
+
 ## 📝 Complete Solution: Approach 1 (Prefix Max Cache)
 
 ```python
