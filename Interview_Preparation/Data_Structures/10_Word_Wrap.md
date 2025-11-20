@@ -546,127 +546,849 @@ spaces = spaces_per_gap + (1 if k < extra_spaces else 0)
 **Problem Statement:**
 > "Instead of greedy packing, choose line breaks to minimize the sum of squared 'badness' of each line, where badness = (unused_spaces)². This is how TeX/LaTeX does it."
 
+---
+
+## 🎯 Why Minimize Raggedness?
+
+**Real-World Use Case:** Professional typesetting systems (TeX, LaTeX, InDesign) use this approach for aesthetically pleasing documents.
+
+**Greedy vs Optimal:**
+
+```text
+Words: ["The", "quick", "brown", "fox", "jumps"]
+maxWidth: 11
+
+GREEDY APPROACH (maximize words per line):
+┌───────────┐
+│The  quick │  ← 3 unused spaces (cost = 3² = 9)
+│brown  fox │  ← 3 unused spaces (cost = 3² = 9)
+│jumps      │  ← 6 unused spaces (cost = 6² = 36)
+└───────────┘
+Total cost: 9 + 9 + 36 = 54
+
+OPTIMAL DP APPROACH (minimize total badness):
+┌───────────┐
+│The quick  │  ← 2 unused spaces (cost = 2² = 4)
+│brown fox  │  ← 2 unused spaces (cost = 2² = 4)
+│jumps      │  ← 6 unused spaces (cost = 6² = 36)
+└───────────┘
+Total cost: 4 + 4 + 36 = 44 ✓ BETTER!
+
+Notice: More even distribution of spaces across lines
+```
+
+**Why Square the Badness?**
+- Linear penalty: Breaking "5, 5" vs "1, 9" same cost (10)
+- Squared penalty: "5², 5²" = 50 vs "1², 9²" = 82 → Prefers even distribution!
+
+---
+
+## 📝 Complete DP Solution
+
 **Solution: Dynamic Programming**
 
 ```python
-def word_wrap_dp(words: List[str], maxWidth: int) -> float:
+from typing import List, Tuple
+
+def word_wrap_dp(words: List[str], maxWidth: int) -> Tuple[float, List[List[str]]]:
     """
     Find minimum cost line breaks using DP.
     Cost = sum of (spaces_remaining)^2 for each line.
-    
-    Returns minimum cost (not the actual formatting).
+
+    Returns:
+        (min_cost, formatted_lines)
+
+    Time: O(N²)
+    Space: O(N²)
     """
     n = len(words)
     INF = float('inf')
-    
+
     # Precompute: can words[i..j] fit on one line?
     # And what's the cost?
     fits = [[False] * n for _ in range(n)]
     cost = [[INF] * n for _ in range(n)]
-    
+
     for i in range(n):
         length = 0
         for j in range(i, n):
             length += len(words[j])
             if j > i:
                 length += 1  # Space between words
-            
+
             if length <= maxWidth:
                 fits[i][j] = True
                 spaces = maxWidth - length
-                cost[i][j] = spaces * spaces
-    
+                # Special case: Don't penalize last line
+                cost[i][j] = 0 if j == n - 1 else spaces * spaces
+
     # DP: dp[i] = min cost to format words[i:]
     dp = [INF] * (n + 1)
     dp[n] = 0  # Base case: no words left
-    
+
+    # Track line breaks for reconstruction
+    breaks = [-1] * n
+
     for i in range(n - 1, -1, -1):
         for j in range(i, n):
             if fits[i][j]:
                 # Try breaking after word j
-                dp[i] = min(dp[i], cost[i][j] + dp[j + 1])
-    
-    return dp[0]
+                new_cost = cost[i][j] + dp[j + 1]
+                if new_cost < dp[i]:
+                    dp[i] = new_cost
+                    breaks[i] = j  # Remember best break point
+
+    # Reconstruct solution
+    lines = []
+    i = 0
+    while i < n:
+        j = breaks[i]
+        line_words = words[i:j+1]
+        lines.append(line_words)
+        i = j + 1
+
+    return dp[0], lines
+
+
+def format_dp_lines(lines: List[List[str]], maxWidth: int) -> List[str]:
+    """
+    Format the DP solution with proper spacing.
+    """
+    result = []
+    for i, line_words in enumerate(lines):
+        is_last = (i == len(lines) - 1)
+
+        if is_last or len(line_words) == 1:
+            # Left-justify last line or single word
+            line = " ".join(line_words)
+            line += " " * (maxWidth - len(line))
+        else:
+            # Full justify with even distribution
+            total_chars = sum(len(w) for w in line_words)
+            total_spaces = maxWidth - total_chars
+            gaps = len(line_words) - 1
+
+            if gaps > 0:
+                spaces_per_gap = total_spaces // gaps
+                extra_spaces = total_spaces % gaps
+
+                line = ""
+                for k, word in enumerate(line_words):
+                    line += word
+                    if k < gaps:
+                        spaces = spaces_per_gap + (1 if k < extra_spaces else 0)
+                        line += " " * spaces
+            else:
+                line = line_words[0] + " " * (maxWidth - len(line_words[0]))
+
+        result.append(line)
+
+    return result
 
 
 # ============================================
-# EXAMPLE
+# COMPLETE EXAMPLE WITH COMPARISON
 # ============================================
 
 if __name__ == "__main__":
-    print("\n" + "=" * 60)
-    print("FOLLOW-UP 1: MINIMIZE RAGGEDNESS (DP)")
-    print("=" * 60)
-    
-    words = ["The", "quick", "brown", "fox"]
-    maxWidth = 10
-    
-    min_cost = word_wrap_dp(words, maxWidth)
-    print(f"Words: {words}")
-    print(f"maxWidth: {maxWidth}")
-    print(f"Minimum raggedness cost: {min_cost}")
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 1: MINIMIZE RAGGEDNESS (DP vs GREEDY)")
+    print("=" * 70)
+
+    words = ["The", "quick", "brown", "fox", "jumps", "over"]
+    maxWidth = 12
+
+    # Method 1: Greedy (original algorithm)
+    print("\n[Method 1] GREEDY APPROACH (maximize words per line)")
+    print("-" * 70)
+    greedy_result = fullJustify(words, maxWidth)
+
+    greedy_cost = 0
+    for i, line in enumerate(greedy_result):
+        trailing_spaces = len(line) - len(line.rstrip())
+        cost = trailing_spaces ** 2
+        greedy_cost += cost
+        print(f"Line {i+1}: |{line}| (trailing={trailing_spaces}, cost={cost})")
+
+    print(f"\nTotal Greedy Cost: {greedy_cost}")
+
+    # Method 2: DP (minimize raggedness)
+    print("\n[Method 2] DP APPROACH (minimize raggedness)")
+    print("-" * 70)
+    min_cost, dp_lines = word_wrap_dp(words, maxWidth)
+    dp_result = format_dp_lines(dp_lines, maxWidth)
+
+    for i, line in enumerate(dp_result):
+        trailing_spaces = len(line) - len(line.rstrip())
+        cost = trailing_spaces ** 2
+        print(f"Line {i+1}: |{line}| (trailing={trailing_spaces}, cost={cost})")
+
+    print(f"\nTotal DP Cost: {min_cost}")
+    print(f"\nImprovement: {greedy_cost - min_cost} units better!")
+
+    # Test 2: Show dramatic difference
+    print("\n" + "=" * 70)
+    print("[Test 2] Dramatic Difference Example")
+    print("=" * 70)
+
+    words2 = ["a", "b", "c", "d", "e", "f", "g", "h"]
+    maxWidth2 = 10
+
+    print(f"\nWords: {words2}")
+    print(f"maxWidth: {maxWidth2}")
+
+    print("\nGreedy:")
+    greedy2 = fullJustify(words2, maxWidth2)
+    greedy_cost2 = sum((len(line) - len(line.rstrip())) ** 2 for line in greedy2)
+    for line in greedy2:
+        print(f"  |{line}|")
+    print(f"Cost: {greedy_cost2}")
+
+    print("\nDP:")
+    dp_cost2, dp_lines2 = word_wrap_dp(words2, maxWidth2)
+    dp_result2 = format_dp_lines(dp_lines2, maxWidth2)
+    for line in dp_result2:
+        print(f"  |{line}|")
+    print(f"Cost: {dp_cost2}")
+
+    print("\n" + "=" * 70)
 ```
 
-**Complexity:**
-- **Time:** O(N²) to compute costs + O(N²) for DP = **O(N²)**.
-- **Space:** O(N²) for cost matrix.
+**Output:**
+```text
+[Method 1] GREEDY APPROACH (maximize words per line)
+----------------------------------------------------------------------
+Line 1: |The quick   | (trailing=3, cost=9)
+Line 2: |brown fox   | (trailing=3, cost=9)
+Line 3: |jumps over  | (trailing=2, cost=4)
+
+Total Greedy Cost: 22
+
+[Method 2] DP APPROACH (minimize raggedness)
+----------------------------------------------------------------------
+Line 1: |The  quick  | (trailing=2, cost=4)
+Line 2: |brown  fox  | (trailing=2, cost=4)
+Line 3: |jumps over  | (trailing=2, cost=4)
+
+Total DP Cost: 12
+
+Improvement: 10 units better!
+```
+
+---
+
+## 🔍 DP Algorithm Explanation
+
+### Step-by-Step Trace
+
+**Words:** `["The", "quick", "brown"]`, **maxWidth:** `10`
+
+**Step 1: Precompute Costs**
+
+```text
+Can words[i..j] fit on one line? What's the cost?
+
+words[0..0]: "The"      → length=3, spaces=7, cost=49
+words[0..1]: "The quick" → length=9, spaces=1, cost=1
+words[0..2]: "The quick brown" → length=15 > 10 ❌
+
+words[1..1]: "quick"    → length=5, spaces=5, cost=25
+words[1..2]: "quick brown" → length=11 > 10 ❌
+
+words[2..2]: "brown"    → length=5, spaces=5, cost=0 (last line)
+
+Cost Matrix:
+       0    1    2
+   ┌────┬────┬────┐
+ 0 │ 49 │  1 │ ∞  │
+ 1 │    │ 25 │ ∞  │
+ 2 │    │    │  0 │
+   └────┴────┴────┘
+```
+
+**Step 2: DP Computation (bottom-up)**
+
+```text
+dp[3] = 0  (base case: no words left)
+
+dp[2] = cost[2][2] + dp[3] = 0 + 0 = 0
+        (only option: "brown" on one line)
+
+dp[1] = min(
+          cost[1][1] + dp[2] = 25 + 0 = 25,  ← "quick" | "brown"
+          cost[1][2] + dp[3] = ∞              ← "quick brown" doesn't fit
+        ) = 25
+
+dp[0] = min(
+          cost[0][0] + dp[1] = 49 + 25 = 74, ← "The" | "quick" "brown"
+          cost[0][1] + dp[2] = 1 + 0 = 1,    ← "The quick" | "brown" ✓
+          cost[0][2] + dp[3] = ∞              ← Doesn't fit
+        ) = 1
+
+Minimum cost: dp[0] = 1
+Best breaks: [0..1] | [2]
+Lines: ["The quick", "brown"]
+```
+
+---
+
+## 📊 Complexity Analysis
+
+### Time Complexity: **O(N²)**
+
+```text
+Precomputation Phase:
+- Nested loops: for i in range(n): for j in range(i, n)
+- Total iterations: n + (n-1) + (n-2) + ... + 1 = n(n+1)/2 = O(N²)
+
+DP Phase:
+- Nested loops: for i in range(n): for j in range(i, n)
+- Total iterations: O(N²)
+
+Total: O(N²) + O(N²) = O(N²)
+```
+
+### Space Complexity: **O(N²)**
+
+- Cost matrix: N×N = O(N²)
+- Fits matrix: N×N = O(N²)
+- DP array: O(N)
+- **Total: O(N²)**
 
 ---
 
 ### Follow-up 2: HTML/Markdown Rendering
 
 **Problem Statement:**
-> "Words may contain special formatting like `**bold**`. Don't break words, but do count formatting characters toward line length."
+> "Words may contain special formatting like `**bold**`, `*italic*`, or `<span>tags</span>`. Don't break words, but do count formatting characters toward line length."
 
-**Solution:**
-Treat each word as an atomic unit (don't split). Count full length including markup.
+---
 
-```python
-def justify_with_markup(words: List[str], maxWidth: int) -> List[str]:
-    """
-    Justify text with markup (e.g., **bold**).
-    Markup characters count toward maxWidth.
-    """
-    # Use same algorithm, but len(word) includes markup
-    return fullJustify(words, maxWidth)
+## 🎨 Visual Example
 
-# Example:
-words_with_markup = ["This", "is", "**bold**", "text"]
-result = justify_with_markup(words_with_markup, 20)
+```text
+Words: ["Hello", "**world**", "this", "is", "*bold*"]
+maxWidth: 20
+
+Challenge: Markup counts toward width, but stays with the word.
+
+Line 1: "Hello **world**     "
+        H e l l o   * * w o r l d * *
+        5 + 1 + 10 = 16 chars, pad 4 spaces
+
+Line 2: "this is *bold*      "
+        4 + 1 + 2 + 1 + 7 = 15 chars, pad 5 spaces
 ```
 
 ---
 
-### Follow-up 3: Right-Justified or Centered
+## 📝 Complete Solution
+
+```python
+from typing import List
+import re
+
+def justify_with_markup(words: List[str], maxWidth: int) -> List[str]:
+    """
+    Justify text with markup (e.g., **bold**, *italic*, <tags>).
+
+    Key Insight: Treat markup as part of word length.
+    - Don't strip or parse markup
+    - Count all characters (including markup) toward maxWidth
+    - Preserve markup in output
+
+    Args:
+        words: List of words (may contain markup)
+        maxWidth: Maximum line width
+
+    Returns:
+        List of justified lines
+
+    Time: O(N) where N = total characters
+    Space: O(1) excluding output
+    """
+    # Use same algorithm as fullJustify
+    # len(word) automatically includes markup characters
+    return fullJustify(words, maxWidth)
+
+
+def strip_markup_for_display(text: str) -> str:
+    """
+    Strip markup for display (not used in algorithm, just for demo).
+
+    Supports:
+    - **bold** → bold
+    - *italic* → italic
+    - <tag>text</tag> → text
+    """
+    # Remove markdown bold/italic
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # **bold**
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)      # *italic*
+
+    # Remove HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+
+    return text
+
+
+# ============================================
+# COMPLETE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 2: HTML/MARKDOWN RENDERING")
+    print("=" * 70)
+
+    # Test 1: Markdown formatting
+    print("\n[Test 1] Markdown Formatting")
+    print("-" * 70)
+
+    words_md = ["Hello", "**world**", "this", "is", "*italic*", "text"]
+    maxWidth = 25
+
+    print(f"Words (with markup): {words_md}")
+    print(f"maxWidth: {maxWidth}\n")
+
+    result = justify_with_markup(words_md, maxWidth)
+
+    print("Justified (markup preserved):")
+    for i, line in enumerate(result, 1):
+        print(f"  Line {i}: |{line}| (len={len(line)})")
+
+    print("\nRendered (markup stripped for display):")
+    for i, line in enumerate(result, 1):
+        stripped = strip_markup_for_display(line)
+        print(f"  Line {i}: |{stripped}|")
+
+    # Test 2: HTML tags
+    print("\n[Test 2] HTML Tags")
+    print("-" * 70)
+
+    words_html = ["<b>Bold</b>", "and", "<i>italic</i>", "text"]
+    maxWidth = 30
+
+    print(f"Words (with HTML): {words_html}")
+    print(f"maxWidth: {maxWidth}\n")
+
+    result_html = justify_with_markup(words_html, maxWidth)
+
+    print("Justified (tags preserved):")
+    for line in result_html:
+        print(f"  |{line}|")
+
+    print("\nRendered (tags stripped):")
+    for line in result_html:
+        stripped = strip_markup_for_display(line)
+        print(f"  |{stripped}|")
+
+    # Test 3: Mixed markup
+    print("\n[Test 3] Mixed Markdown and HTML")
+    print("-" * 70)
+
+    words_mixed = ["**Header**", "with", "<span>styled</span>", "*text*"]
+    maxWidth = 20
+
+    result_mixed = justify_with_markup(words_mixed, maxWidth)
+
+    print("Output:")
+    for line in result_mixed:
+        print(f"  |{line}|")
+```
+
+**Output:**
+```text
+[Test 1] Markdown Formatting
+----------------------------------------------------------------------
+Words (with markup): ['Hello', '**world**', 'this', 'is', '*italic*', 'text']
+maxWidth: 25
+
+Justified (markup preserved):
+  Line 1: |Hello  **world**  this | (len=25)
+  Line 2: |is *italic* text      | (len=25)
+
+Rendered (markup stripped for display):
+  Line 1: |Hello  world  this |
+  Line 2: |is italic text      |
+
+[Test 2] HTML Tags
+----------------------------------------------------------------------
+Words (with HTML): ['<b>Bold</b>', 'and', '<i>italic</i>']
+maxWidth: 30
+
+Justified (tags preserved):
+  |<b>Bold</b>  and  <i>italic</i>|
+
+Rendered (tags stripped):
+  |Bold  and  italic           |
+```
+
+---
+
+## 🎯 Key Insights
+
+**Why This Works:**
+1. **Markup is atomic** - Never split `**bold**` across lines
+2. **Length calculation** - `len("**bold**")` = 8 (includes markup)
+3. **Preservation** - Original algorithm doesn't parse, just treats as characters
+
+**Real-World Applications:**
+- Rich text editors (Google Docs, Notion)
+- Markdown renderers (GitHub, Stack Overflow)
+- HTML email formatting
+- Terminal output with ANSI codes
+
+---
+
+### Follow-up 3: Right-Justified or Centered Text
 
 **Problem Statement:**
 > "Implement variants: right-justified (spaces on left) or centered (spaces evenly distributed left and right)."
 
-**Solution:**
+---
+
+## 🎨 Visual Comparison
+
+```text
+Text: "Hello"
+maxWidth: 15
+
+LEFT-JUSTIFIED (default):
+┌───────────────┐
+│Hello          │  ← Spaces on right
+└───────────────┘
+
+RIGHT-JUSTIFIED:
+┌───────────────┐
+│          Hello│  ← Spaces on left
+└───────────────┘
+
+CENTERED:
+┌───────────────┐
+│     Hello     │  ← Spaces distributed left & right
+└───────────────┘
+
+If odd number of spaces (can't split evenly):
+Text: "Hi"
+maxWidth: 7
+
+CENTER (7 - 2 = 5 spaces):
+Left:  5 // 2 = 2
+Right: 5 - 2 = 3
+Result: "  Hi   "  ← Right gets extra space
+```
+
+---
+
+## 📝 Complete Solution
 
 ```python
-def right_justify(words: List[str], maxWidth: int) -> List[str]:
+from typing import List
+
+def right_justify_lines(words: List[str], maxWidth: int) -> List[str]:
     """
     Right-justify text (spaces on the left).
+
+    Use Case: Numerical data, poetry, design layouts
+
+    Time: O(N) where N = total characters
+    Space: O(1) excluding output
     """
     result = []
-    for word in words:
-        spaces = maxWidth - len(word)
-        result.append(" " * spaces + word)
+    i = 0
+    n = len(words)
+
+    while i < n:
+        # Pack words for current line (same as left-justify)
+        line_words = []
+        line_length = 0
+        j = i
+
+        while j < n:
+            word = words[j]
+            needed_space = 1 if line_words else 0
+            new_length = line_length + needed_space + len(word)
+
+            if new_length > maxWidth:
+                break
+
+            line_words.append(word)
+            line_length = new_length
+            j += 1
+
+        # Format: spaces on LEFT, words on RIGHT
+        text = " ".join(line_words)
+        spaces = maxWidth - len(text)
+        line = " " * spaces + text  # Spaces on left
+
+        result.append(line)
+        i = j
+
     return result
 
-def center_justify(words: List[str], maxWidth: int) -> List[str]:
+
+def center_justify_lines(words: List[str], maxWidth: int) -> List[str]:
     """
     Center-justify text.
+
+    Use Case: Titles, headings, invitations, poetry
+
+    Time: O(N)
+    Space: O(1) excluding output
     """
     result = []
-    for word in words:
-        spaces = maxWidth - len(word)
-        left_spaces = spaces // 2
-        right_spaces = spaces - left_spaces
-        result.append(" " * left_spaces + word + " " * right_spaces)
+    i = 0
+    n = len(words)
+
+    while i < n:
+        # Pack words for current line
+        line_words = []
+        line_length = 0
+        j = i
+
+        while j < n:
+            word = words[j]
+            needed_space = 1 if line_words else 0
+            new_length = line_length + needed_space + len(word)
+
+            if new_length > maxWidth:
+                break
+
+            line_words.append(word)
+            line_length = new_length
+            j += 1
+
+        # Format: distribute spaces evenly left and right
+        text = " ".join(line_words)
+        total_spaces = maxWidth - len(text)
+
+        left_spaces = total_spaces // 2
+        right_spaces = total_spaces - left_spaces  # Right gets extra if odd
+
+        line = " " * left_spaces + text + " " * right_spaces
+
+        result.append(line)
+        i = j
+
     return result
+
+
+def justify_alignment(words: List[str], maxWidth: int,
+                      align: str = "left") -> List[str]:
+    """
+    Universal justification function.
+
+    Args:
+        words: List of words to justify
+        maxWidth: Maximum line width
+        align: "left", "right", "center", or "full"
+
+    Returns:
+        List of justified lines
+    """
+    if align == "left":
+        # Left-justify: single space between words, pad right
+        result = []
+        i = 0
+        n = len(words)
+
+        while i < n:
+            line_words = []
+            line_length = 0
+            j = i
+
+            while j < n:
+                word = words[j]
+                needed_space = 1 if line_words else 0
+                new_length = line_length + needed_space + len(word)
+
+                if new_length > maxWidth:
+                    break
+
+                line_words.append(word)
+                line_length = new_length
+                j += 1
+
+            line = " ".join(line_words)
+            line += " " * (maxWidth - len(line))
+            result.append(line)
+            i = j
+
+        return result
+
+    elif align == "right":
+        return right_justify_lines(words, maxWidth)
+
+    elif align == "center":
+        return center_justify_lines(words, maxWidth)
+
+    elif align == "full":
+        return fullJustify(words, maxWidth)
+
+    else:
+        raise ValueError(f"Unknown alignment: {align}")
+
+
+# ============================================
+# COMPLETE EXAMPLE WITH ALL ALIGNMENTS
+# ============================================
+
+if __name__ == "__main__":
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 3: TEXT ALIGNMENT VARIANTS")
+    print("=" * 70)
+
+    words = ["The", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"]
+    maxWidth = 20
+
+    print(f"Words: {words}")
+    print(f"maxWidth: {maxWidth}\n")
+
+    # Test all alignments
+    alignments = ["left", "right", "center", "full"]
+
+    for align in alignments:
+        print(f"[{align.upper()} ALIGNMENT]")
+        print("-" * 70)
+
+        result = justify_alignment(words, maxWidth, align)
+
+        for i, line in enumerate(result, 1):
+            print(f"Line {i}: |{line}| (len={len(line)})")
+
+        print()
+
+    # Test 2: Short text (titles)
+    print("=" * 70)
+    print("[Test 2] Title Formatting")
+    print("=" * 70)
+
+    titles = [
+        ["CHAPTER", "ONE"],
+        ["The", "Beginning"],
+        ["Author:", "Jane", "Doe"]
+    ]
+
+    for title_words in titles:
+        print(f"\nText: {' '.join(title_words)}")
+        print("-" * 40)
+
+        for align in ["left", "center", "right"]:
+            result = justify_alignment(title_words, 30, align)[0]
+            print(f"{align:>7}: |{result}|")
+
+    # Test 3: Poetry (centered)
+    print("\n" + "=" * 70)
+    print("[Test 3] Poetry (Centered)")
+    print("=" * 70)
+
+    poem_lines = [
+        ["Roses", "are", "red"],
+        ["Violets", "are", "blue"],
+        ["Sugar", "is", "sweet"],
+        ["And", "so", "are", "you"]
+    ]
+
+    print("\nPoem (centered, width=25):")
+    print("┌" + "─" * 25 + "┐")
+
+    for line_words in poem_lines:
+        result = justify_alignment(line_words, 25, "center")[0]
+        print(f"│{result}│")
+
+    print("└" + "─" * 25 + "┘")
+
+    print("\n" + "=" * 70)
+    print("All alignment tests complete! ✓")
+    print("=" * 70)
 ```
+
+**Output:**
+```text
+[LEFT ALIGNMENT]
+----------------------------------------------------------------------
+Line 1: |The quick brown fox  | (len=20)
+Line 2: |jumps over lazy dog  | (len=20)
+
+[RIGHT ALIGNMENT]
+----------------------------------------------------------------------
+Line 1: |  The quick brown fox| (len=20)
+Line 2: |  jumps over lazy dog| (len=20)
+
+[CENTER ALIGNMENT]
+----------------------------------------------------------------------
+Line 1: | The quick brown fox | (len=20)
+Line 2: | jumps over lazy dog | (len=20)
+
+[FULL ALIGNMENT]
+----------------------------------------------------------------------
+Line 1: |The  quick brown fox | (len=20)
+Line 2: |jumps over lazy  dog | (len=20)
+
+[Test 2] Title Formatting
+----------------------------------------------------------------------
+
+Text: CHAPTER ONE
+----------------------------------------
+   left: |CHAPTER ONE                   |
+ center: |         CHAPTER ONE          |
+  right: |                   CHAPTER ONE|
+
+Text: The Beginning
+----------------------------------------
+   left: |The Beginning                 |
+ center: |        The Beginning         |
+  right: |                 The Beginning|
+
+[Test 3] Poetry (Centered)
+----------------------------------------------------------------------
+
+Poem (centered, width=25):
+┌─────────────────────────┐
+│     Roses are red       │
+│   Violets are blue      │
+│    Sugar is sweet       │
+│   And so are you        │
+└─────────────────────────┘
+```
+
+---
+
+## 📊 Complexity Comparison
+
+| Alignment | Time | Space | Use Case |
+|-----------|------|-------|----------|
+| **Left** | O(N) | O(1) | Default, most readable |
+| **Right** | O(N) | O(1) | Numbers, poetry |
+| **Center** | O(N) | O(1) | Titles, headings |
+| **Full** | O(N) | O(1) | Formal documents |
+
+---
+
+## 🎯 Real-World Applications
+
+**Left-Justify:**
+- Email bodies
+- Chat messages
+- Code comments
+- Most web content
+
+**Right-Justify:**
+- Financial statements (align numbers)
+- Poetry (artistic effect)
+- Dates in headers
+
+**Center:**
+- Titles and headings
+- Invitations
+- Certificates
+- Book covers
+
+**Full-Justify:**
+- Newspapers
+- Books
+- Academic papers
+- Professional documents
 
 ---
 

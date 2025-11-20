@@ -495,80 +495,670 @@ Query getMaxPrice(4):
 
 For **balanced** or **write-heavy** workloads, use a **Segment Tree** with **coordinate compression**.
 
-### Coordinate Compression
+---
 
-Since timestamps are sparse (1, 1000, 1000000), we:
-1. Collect all unique timestamps
-2. Map timestamp → compressed index (0, 1, 2, ...)
-3. Build segment tree on compressed indices
+## 🎓 What is a Segment Tree?
+
+A **Segment Tree** is a binary tree where:
+- **Each node** represents a range [L, R] of the array
+- **Leaf nodes** represent single elements
+- **Internal nodes** store aggregated information (max, min, sum) of their children
+
+**Why use it?**
+- Both **update** and **query** operations are **O(log N)**
+- Perfect for dynamic range queries
+
+---
+
+## 📐 Segment Tree Structure
+
+### Tree Representation (Array of 8 Prices)
+
+```text
+Original Array (indices 0-7):
+┌────┬────┬────┬────┬────┬────┬────┬────┐
+│ 50 │100 │ 80 │200 │150 │ 90 │120 │160 │
+└────┴────┴────┴────┴────┴────┴────┴────┘
+  0    1    2    3    4    5    6    7
+
+Segment Tree (stored as array):
+                    ┌─────────────┐
+                    │   [0-7]     │
+                    │   MAX=200   │  ← Root (index 0)
+                    └──────┬──────┘
+                           │
+            ┌──────────────┴──────────────┐
+            │                             │
+       ┌────┴────┐                   ┌────┴────┐
+       │ [0-3]   │                   │ [4-7]   │
+       │ MAX=200 │                   │ MAX=160 │
+       └────┬────┘                   └────┬────┘
+            │                             │
+      ┌─────┴─────┐               ┌───────┴───────┐
+      │           │               │               │
+  ┌───┴───┐   ┌───┴───┐      ┌───┴───┐       ┌───┴───┐
+  │ [0-1] │   │ [2-3] │      │ [4-5] │       │ [6-7] │
+  │MAX=100│   │MAX=200│      │MAX=150│       │MAX=160│
+  └───┬───┘   └───┬───┘      └───┬───┘       └───┬───┘
+      │           │              │               │
+   ┌──┴──┐     ┌──┴──┐       ┌──┴──┐         ┌──┴──┐
+   │     │     │     │       │     │         │     │
+ ┌─┴─┐ ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   ┌─┴─┐ ┌─┴─┐     ┌─┴─┐ ┌─┴─┐
+ │[0]│ │[1]│ │[2]│ │[3]│   │[4]│ │[5]│     │[6]│ │[7]│
+ │50 │ │100│ │80 │ │200│   │150│ │90 │     │120│ │160│
+ └───┘ └───┘ └───┘ └───┘   └───┘ └───┘     └───┘ └───┘
+ Leaf   Leaf  Leaf  Leaf    Leaf  Leaf      Leaf  Leaf
+```
+
+### Array Representation (1-indexed for clarity):
+
+```text
+Index:  0     1      2      3      4      5      6      7      8      9     10     11    12    13    14    15
+       ┌────┬────┬──────┬──────┬──────┬──────┬──────┬──────┬────┬────┬────┬────┬────┬────┬────┬────┐
+Value: │    │200 │ 100  │ 200  │ 150  │ 160  │  -   │  -   │ 50 │100 │ 80 │200 │150 │ 90 │120 │160 │
+       └────┴────┴──────┴──────┴──────┴──────┴──────┴──────┴────┴────┴────┴────┴────┴────┴────┴────┘
+Range:      [0-7]  [0-3]  [4-7]  [0-1]  [2-3]  [4-5]  [6-7]  [0]  [1]  [2]  [3]  [4]  [5]  [6]  [7]
+```
+
+**Key Pattern:**
+- **Parent at index i** → Children at **2*i** (left) and **2*i+1** (right)
+- **Leaf nodes** start at index **n** (tree size)
+- **Tree size** = 4 * N (to guarantee space for all levels)
+
+---
+
+## 🔧 Coordinate Compression (Critical!)
+
+Since timestamps are **sparse** (1, 1000, 1000000), we can't build a segment tree with 1 million nodes!
+
+### Problem Example:
+```text
+Timestamps: [1, 1000, 1000000]
+Prices:     [100, 200, 150]
+
+❌ WRONG: Build tree of size 4 * 1000000 = 4,000,000 (wasteful!)
+```
+
+### Solution: Coordinate Compression
+```text
+Step 1: Collect unique timestamps
+Timestamps: [1, 1000, 1000000]
+
+Step 2: Map to compressed indices
+┌───────────┬───────────┬──────────────┐
+│ Timestamp │   Price   │ Compressed   │
+├───────────┼───────────┼──────────────┤
+│     1     │    100    │      0       │
+│   1000    │    200    │      1       │
+│ 1000000   │    150    │      2       │
+└───────────┴───────────┴──────────────┘
+
+Step 3: Build segment tree on compressed indices [0, 1, 2]
+✅ CORRECT: Tree size = 4 * 3 = 12 nodes (efficient!)
+```
+
+### Visual Mapping:
+```text
+Real World (Sparse):
+t=1──────────────t=1000───────────────────────────────────t=1000000
+100              200                                       150
+
+Compressed (Dense):
+idx=0────idx=1────idx=2
+100      200      150
+  │       │        │
+  └───────┴────────┘
+         │
+    Segment Tree
+    (Only 3 leaves!)
+```
+
+---
+
+## 📝 Complete Segment Tree Implementation
 
 ```python
+import bisect
+from typing import Optional, List
+
 class SegmentTreeTracker:
     """
-    Commodity tracker using Segment Tree for O(log N) updates and queries.
+    Commodity price tracker using Segment Tree for O(log N) updates and queries.
+
+    Uses coordinate compression to handle sparse timestamps efficiently.
     """
-    
+
     def __init__(self):
-        self.timestamp_to_price = {}  # Ground truth
-        self.sorted_timestamps = []   # Compressed coordinates
-        self.tree = None
+        # Ground truth: timestamp → price
+        self.timestamp_to_price = {}
+
+        # Compressed coordinates (sorted unique timestamps)
+        self.sorted_timestamps = []
+
+        # Segment tree (array representation)
+        self.tree = []
+
+        # Dirty flag: rebuild tree if new timestamps added
         self.dirty = False
-    
+
     def update(self, timestamp: int, price: int) -> None:
         """
-        Update price. Rebuilds tree if needed.
-        
-        Time: O(log N) update + O(N log N) rebuild if new timestamp
+        Add or update price at timestamp.
+
+        Time Complexity:
+        - O(log N) if timestamp exists (single tree update)
+        - O(N log N) if new timestamp (rebuild tree)
+
+        Space: O(1)
         """
         self.timestamp_to_price[timestamp] = price
-        
+
+        # Check if this is a new timestamp
         if timestamp not in self.sorted_timestamps:
+            # New timestamp: add and resort
             self.sorted_timestamps.append(timestamp)
             self.sorted_timestamps.sort()
             self.dirty = True
-        
+
+        # Rebuild tree if needed (new timestamp added)
         if self.dirty:
             self._rebuild_tree()
         else:
-            # Update existing position
+            # Update existing position in tree
             idx = bisect.bisect_left(self.sorted_timestamps, timestamp)
-            self._update_tree(idx, price)
-    
-    def _rebuild_tree(self):
-        """Build segment tree from scratch."""
+            self._update_single(idx, price)
+
+    def _rebuild_tree(self) -> None:
+        """
+        Build segment tree from scratch.
+
+        Time: O(N) - builds tree bottom-up
+        Space: O(N) - tree array
+        """
         n = len(self.sorted_timestamps)
-        self.tree = [0] * (4 * n)
-        for i, ts in enumerate(self.sorted_timestamps):
-            self._update_tree(i, self.timestamp_to_price[ts])
+
+        if n == 0:
+            self.tree = []
+            self.dirty = False
+            return
+
+        # Allocate tree array (4*n guarantees enough space)
+        self.tree = [float('-inf')] * (4 * n)
+
+        # Build tree by processing each leaf
+        self._build(0, 0, n - 1)
+
         self.dirty = False
-    
-    def _update_tree(self, index, value):
-        """Update segment tree at index."""
-        # Standard segment tree update (omitted for brevity)
-        pass
-    
+
+    def _build(self, node: int, start: int, end: int) -> None:
+        """
+        Recursively build segment tree.
+
+        Args:
+            node: Current node index in tree array
+            start: Left boundary of range (compressed index)
+            end: Right boundary of range (compressed index)
+        """
+        if start == end:
+            # Leaf node: store price at this compressed index
+            timestamp = self.sorted_timestamps[start]
+            self.tree[node] = self.timestamp_to_price[timestamp]
+            return
+
+        # Internal node: recursively build children
+        mid = (start + end) // 2
+        left_child = 2 * node + 1
+        right_child = 2 * node + 2
+
+        # Build left subtree [start, mid]
+        self._build(left_child, start, mid)
+
+        # Build right subtree [mid+1, end]
+        self._build(right_child, mid + 1, end)
+
+        # Store max of children
+        self.tree[node] = max(self.tree[left_child], self.tree[right_child])
+
+    def _update_single(self, index: int, value: int) -> None:
+        """
+        Update a single leaf in the segment tree and propagate upwards.
+
+        Time: O(log N)
+
+        Args:
+            index: Compressed index to update
+            value: New price value
+        """
+        n = len(self.sorted_timestamps)
+        self._update_recursive(0, 0, n - 1, index, value)
+
+    def _update_recursive(self, node: int, start: int, end: int,
+                          index: int, value: int) -> None:
+        """
+        Recursively update tree node.
+
+        Args:
+            node: Current node index
+            start, end: Range of current node
+            index: Target index to update
+            value: New value
+        """
+        if start == end:
+            # Reached leaf node
+            self.tree[node] = value
+            return
+
+        mid = (start + end) // 2
+        left_child = 2 * node + 1
+        right_child = 2 * node + 2
+
+        if index <= mid:
+            # Update in left subtree
+            self._update_recursive(left_child, start, mid, index, value)
+        else:
+            # Update in right subtree
+            self._update_recursive(right_child, mid + 1, end, index, value)
+
+        # Recalculate max for current node
+        self.tree[node] = max(self.tree[left_child], self.tree[right_child])
+
     def getMaxPrice(self, timestamp: int) -> Optional[int]:
         """
-        Query max in range [0, timestamp].
-        
+        Get maximum price at or before timestamp.
+
+        This queries the segment tree for max in range [0, compressed_idx]
+        where compressed_idx is the largest index with timestamp <= query.
+
         Time: O(log N)
+        Space: O(log N) recursion stack
         """
         if not self.sorted_timestamps:
             return None
-        
-        # Find compressed index
+
+        # Find rightmost timestamp <= query timestamp
+        # This gives us the compressed index
         idx = bisect.bisect_right(self.sorted_timestamps, timestamp) - 1
-        
+
         if idx < 0:
+            # No data at or before this timestamp
             return None
-        
-        # Query segment tree for range [0, idx]
-        return self._query_tree(0, idx)
-    
-    def _query_tree(self, left, right):
-        """Query max in range [left, right]."""
-        # Standard segment tree query (omitted for brevity)
-        pass
+
+        # Query segment tree for max in range [0, idx]
+        n = len(self.sorted_timestamps)
+        return self._query(0, 0, n - 1, 0, idx)
+
+    def _query(self, node: int, start: int, end: int,
+               query_left: int, query_right: int) -> int:
+        """
+        Query maximum value in range [query_left, query_right].
+
+        Time: O(log N) - visits at most 2*log(N) nodes
+
+        Args:
+            node: Current node index
+            start, end: Range of current node
+            query_left, query_right: Query range (compressed indices)
+
+        Returns:
+            Maximum value in query range
+        """
+        # Case 1: No overlap
+        if query_right < start or query_left > end:
+            return float('-inf')
+
+        # Case 2: Complete overlap (current range inside query range)
+        if query_left <= start and end <= query_right:
+            return self.tree[node]
+
+        # Case 3: Partial overlap - query both children
+        mid = (start + end) // 2
+        left_child = 2 * node + 1
+        right_child = 2 * node + 2
+
+        left_max = self._query(left_child, start, mid, query_left, query_right)
+        right_max = self._query(right_child, mid + 1, end, query_left, query_right)
+
+        return max(left_max, right_max)
+
+
+# ============================================
+# COMPLETE EXAMPLE WITH DETAILED OUTPUT
+# ============================================
+
+if __name__ == "__main__":
+    print("=" * 70)
+    print("SEGMENT TREE COMMODITY TRACKER - DETAILED EXAMPLE")
+    print("=" * 70)
+
+    tracker = SegmentTreeTracker()
+
+    # Test 1: Build tree with sparse timestamps
+    print("\n[Test 1] Building Tree with Sparse Timestamps")
+    print("-" * 70)
+
+    tracker.update(1, 100)
+    tracker.update(1000, 200)
+    tracker.update(1000000, 150)
+
+    print(f"Timestamps (sparse): {tracker.sorted_timestamps}")
+    print(f"Compressed indices: [0, 1, 2]")
+    print(f"Tree size: {len(tracker.tree)} nodes (4 * 3 = 12)")
+    print(f"\nSegment Tree Array: {tracker.tree[:12]}")
+
+    # Test 2: Query operations
+    print("\n[Test 2] Query Operations")
+    print("-" * 70)
+
+    queries = [1, 500, 1000, 50000, 1000000, 2000000]
+    for q in queries:
+        result = tracker.getMaxPrice(q)
+        print(f"getMaxPrice({q:>7}) = {result}")
+
+    # Test 3: Out-of-order updates
+    print("\n[Test 3] Out-of-Order Updates")
+    print("-" * 70)
+
+    tracker2 = SegmentTreeTracker()
+
+    tracker2.update(10, 200)
+    print(f"After update(10, 200): timestamps = {tracker2.sorted_timestamps}")
+
+    tracker2.update(5, 300)
+    print(f"After update(5, 300):  timestamps = {tracker2.sorted_timestamps}")
+
+    tracker2.update(7, 250)
+    print(f"After update(7, 250):  timestamps = {tracker2.sorted_timestamps}")
+
+    print(f"\nQuery Results:")
+    for t in [5, 7, 10]:
+        print(f"  Max at t={t}: {tracker2.getMaxPrice(t)}")
+
+    # Test 4: Price corrections
+    print("\n[Test 4] Price Corrections (Update Existing)")
+    print("-" * 70)
+
+    tracker3 = SegmentTreeTracker()
+    tracker3.update(5, 100)
+    tracker3.update(10, 150)
+
+    print(f"Initial: t=5→100, t=10→150")
+    print(f"Max at t=10: {tracker3.getMaxPrice(10)}")
+
+    tracker3.update(5, 400)  # Correct price at t=5
+    print(f"\nAfter correction: t=5→400")
+    print(f"Max at t=10: {tracker3.getMaxPrice(10)}")
+
+    # Test 5: Performance comparison
+    print("\n[Test 5] Performance Characteristics")
+    print("-" * 70)
+
+    import time
+
+    tracker4 = SegmentTreeTracker()
+
+    # Build with 1000 timestamps
+    timestamps = list(range(1, 1001))
+
+    start = time.time()
+    for t in timestamps:
+        tracker4.update(t, t * 10)
+    build_time = time.time() - start
+
+    # Query 1000 times
+    start = time.time()
+    for t in range(1, 1001):
+        tracker4.getMaxPrice(t)
+    query_time = time.time() - start
+
+    print(f"Dataset: 1000 timestamps")
+    print(f"Build time: {build_time*1000:.2f} ms")
+    print(f"1000 queries: {query_time*1000:.2f} ms ({query_time/1000*1000:.3f} ms/query)")
+
+    print("\n" + "=" * 70)
+    print("All tests passed! ✓")
+    print("=" * 70)
+```
+
+---
+
+## 🎯 Step-by-Step Query Example
+
+Let's trace a query operation with **visual diagrams**.
+
+### Setup:
+```python
+tracker.update(3, 100)
+tracker.update(5, 200)
+tracker.update(7, 150)
+tracker.update(10, 300)
+```
+
+### Step 1: Coordinate Compression
+```text
+Timestamps: [3, 5, 7, 10]
+Prices:     [100, 200, 150, 300]
+
+Compressed Mapping:
+┌───────────┬───────┬──────────────┐
+│ Timestamp │ Price │ Compressed   │
+├───────────┼───────┼──────────────┤
+│     3     │  100  │      0       │
+│     5     │  200  │      1       │
+│     7     │  150  │      2       │
+│    10     │  300  │      3       │
+└───────────┴───────┴──────────────┘
+```
+
+### Step 2: Build Segment Tree
+```text
+                    ┌──────────────┐
+                    │   [0-3]      │  ← Node 0
+                    │   MAX = 300  │     (Root)
+                    └───────┬──────┘
+                            │
+            ┌───────────────┴────────────────┐
+            │                                │
+       ┌────┴─────┐                    ┌────┴─────┐
+       │  [0-1]   │                    │  [2-3]   │
+       │ MAX=200  │ ← Node 1           │ MAX=300  │ ← Node 2
+       └────┬─────┘                    └────┬─────┘
+            │                               │
+      ┌─────┴─────┐                   ┌─────┴─────┐
+      │           │                   │           │
+   ┌──┴──┐     ┌──┴──┐             ┌──┴──┐     ┌──┴──┐
+   │ [0] │     │ [1] │             │ [2] │     │ [3] │
+   │ 100 │     │ 200 │             │ 150 │     │ 300 │
+   └─────┘     └─────┘             └─────┘     └─────┘
+   Node 3      Node 4              Node 5      Node 6
+   (Leaf)      (Leaf)              (Leaf)      (Leaf)
+```
+
+### Tree Array Representation:
+```text
+Index:  0    1    2    3    4    5    6    7    8    9   10   11
+       ┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐
+Value: │300 │200 │300 │100 │200 │150 │300 │ -  │ -  │ -  │ -  │ -  │
+       └────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘
+Range: [0-3][0-1][2-3] [0] [1] [2] [3]
+```
+
+---
+
+## 🔍 Query Trace: `getMaxPrice(7)`
+
+**Goal:** Find max price for all timestamps ≤ 7
+
+### Step 1: Find Compressed Index
+```text
+Query: timestamp = 7
+Sorted timestamps: [3, 5, 7, 10]
+
+Binary search for rightmost timestamp ≤ 7:
+- bisect_right([3, 5, 7, 10], 7) = 3
+- compressed_idx = 3 - 1 = 2
+
+Query becomes: max in range [0, 2] (compressed indices)
+```
+
+### Step 2: Segment Tree Query
+```text
+Query: max in range [0, 2]
+
+Visual Traversal:
+                    ┌──────────────┐
+                    │   [0-3]      │  ← Check: Does [0-3] overlap [0-2]?
+                    │   MAX = 300  │     YES (partial) → recurse
+                    └───────┬──────┘
+                            │
+            ┌───────────────┴────────────────┐
+            │                                │
+       ┌────┴─────┐                    ┌────┴─────┐
+       │  [0-1]   │  ← [0-1] ⊆ [0-2]  │  [2-3]   │  ← [2-3] ∩ [0-2]?
+       │ MAX=200  │    ✓ Complete!     │ MAX=300  │     Partial!
+       └──────────┘    Return 200      └────┬─────┘
+                                             │
+                                    ┌────────┴────────┐
+                                    │                 │
+                                 ┌──┴──┐           ┌──┴──┐
+                                 │ [2] │  ← [2]    │ [3] │  ← [3]
+                                 │ 150 │    In!    │ 300 │    Out!
+                                 └─────┘   ✓       └─────┘    ✗
+                                 Return 150        Return -∞
+
+Final: max(200, max(150, -∞)) = max(200, 150) = 200
+```
+
+### Step 3: Visual Call Tree
+```text
+_query(node=0, range=[0-3], query=[0-2])
+│
+├─ _query(node=1, range=[0-1], query=[0-2])  ← Complete overlap
+│  └─ return 200 ✓
+│
+└─ _query(node=2, range=[2-3], query=[0-2])  ← Partial overlap
+   │
+   ├─ _query(node=5, range=[2-2], query=[0-2])  ← [2] in [0-2]
+   │  └─ return 150 ✓
+   │
+   └─ _query(node=6, range=[3-3], query=[0-2])  ← [3] NOT in [0-2]
+      └─ return -∞ ✗
+
+Result: max(200, max(150, -∞)) = 200
+```
+
+**Answer:** Max price for timestamps ≤ 7 is **200** (at timestamp 5)
+
+---
+
+## 📊 Update Operation Example
+
+### Update Existing Value: `update(5, 500)` (correction)
+
+**Before:**
+```text
+Timestamps: [3, 5, 7, 10]
+Prices:     [100, 200, 150, 300]
+Compressed index for t=5: 1
+```
+
+**Step 1: Find Compressed Index**
+```python
+idx = bisect_left([3, 5, 7, 10], 5) = 1
+```
+
+**Step 2: Recursive Update**
+```text
+                    ┌──────────────┐
+                    │   [0-3]      │  ← Update propagates up
+                    │   MAX = 300  │     Recalc: max(500, 300)
+                    │    ↓ 500     │     New: 500 ✓
+                    └───────┬──────┘
+                            │
+            ┌───────────────┴────────────────┐
+            │                                │
+       ┌────┴─────┐                    ┌────┴─────┐
+       │  [0-1]   │  ← Update here     │  [2-3]   │  ← Unchanged
+       │ MAX=200  │     Recalc!        │ MAX=300  │
+       │  ↓ 500   │     max(100, 500)  └──────────┘
+       └────┬─────┘     New: 500 ✓
+            │
+      ┌─────┴─────┐
+      │           │
+   ┌──┴──┐     ┌──┴──┐
+   │ [0] │     │ [1] │  ← Target! Update 200→500
+   │ 100 │     │ 500 │     ✓
+   └─────┘     └─────┘
+```
+
+**After:**
+```text
+Tree Array:
+Index:  0    1    2    3    4    5    6
+Value: 500  500  300  100  500  150  300
+       ↑    ↑         ↑
+     Updated from 300→500, 200→500, 200→500
+```
+
+**Complexity:** O(log N) - visits at most log(N) nodes (one path from leaf to root)
+
+---
+
+## 🆚 Comparison: Prefix Max Cache vs Segment Tree
+
+| Feature | Prefix Max Cache | Segment Tree |
+|---------|------------------|--------------|
+| **Update (existing)** | O(1) mark dirty | **O(log N)** ✓ |
+| **Update (new timestamp)** | O(N) insert + sort | O(N log N) rebuild |
+| **Query (cache hot)** | **O(log N)** ✓ | O(log N) |
+| **Query (cache miss)** | O(N) rebuild | **O(log N)** ✓ |
+| **Space** | O(N) | O(4N) |
+| **Best for** | Read-heavy | Balanced/write-heavy |
+
+### When to Choose Segment Tree:
+1. **Write-heavy workload**: Many updates, fewer queries
+2. **Real-time systems**: Need predictable O(log N) performance
+3. **Range queries**: Need max/min/sum in arbitrary ranges [L, R]
+4. **Balanced operations**: Equal mix of reads and writes
+
+### When to Choose Prefix Max Cache:
+1. **Read-heavy workload**: Many queries, few updates
+2. **Batch updates**: Can update 100 values, then query 10000 times
+3. **Memory constrained**: Need minimal space overhead
+
+---
+
+## 🧮 Complexity Analysis (Segment Tree)
+
+### Time Complexity:
+
+| Operation | Complexity | Explanation |
+|-----------|------------|-------------|
+| **Build Tree** | O(N) | Visit each node once, 2N-1 nodes total |
+| **Update (existing)** | **O(log N)** | Traverse one path from leaf to root |
+| **Update (new timestamp)** | O(N log N) | Rebuild entire tree (rare) |
+| **Query** | **O(log N)** | Visit at most 4 nodes per level |
+
+### Space Complexity:
+- **Tree Array:** O(4N) = O(N)
+- **Coordinate Map:** O(N)
+- **Recursion Stack:** O(log N)
+- **Total:** **O(N)**
+
+### Proof of Query Complexity:
+
+At each level, the query range can intersect at most **4 nodes**:
+
+```text
+Level 0 (root):        [0-15]           ← 1 node
+
+Level 1:          [0-7]    [8-15]       ← At most 2 nodes
+
+Level 2:      [0-3][4-7][8-11][12-15]   ← At most 4 nodes
+
+Level 3: [0-1][2-3]... (at most 4)
+
+Height = log₂(N)
+Nodes visited ≤ 4 * log₂(N) = O(log N)
 ```
 
 **Complexity:**
