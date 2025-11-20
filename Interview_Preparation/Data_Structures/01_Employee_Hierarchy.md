@@ -183,6 +183,16 @@ This version is concise, uses standard Python dictionaries, and is perfect for a
 def find_closest_group_simple(hierarchy, employees):
     """
     Simplified solution using a dictionary for parent lookups.
+    
+    Args:
+        hierarchy: Nested dict representing the organization structure
+        employees: List of employee names to find common ancestor for
+        
+    Returns:
+        Name of the closest common group, or None if not found
+        
+    Time: O(K × H) where K = number of employees, H = tree height
+    Space: O(N) for parent map where N = total nodes
     """
     # 1. Build a Parent Map (child -> parent)
     # This replaces the entire TreeNode class and tree building logic
@@ -236,6 +246,96 @@ def find_closest_group_simple(hierarchy, employees):
         return parent_map.get(lca)
         
     return lca
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    # Build organization hierarchy
+    hierarchy = {
+        "Engg": {
+            "Backend": ["Alice", "Bob"],
+            "Frontend": ["Lisa"],
+            "Mobile": ["Mike"]
+        },
+        "HR": ["Charlie"],
+        "Sales": {
+            "North": ["David"],
+            "South": ["Eve"]
+        }
+    }
+    
+    # Test cases
+    print("=" * 50)
+    print("EMPLOYEE HIERARCHY - SIMPLIFIED VERSION")
+    print("=" * 50)
+    
+    test_cases = [
+        (["Alice", "Bob"], "Backend"),
+        (["Alice", "Lisa"], "Engg"),
+        (["Alice", "Bob", "Lisa"], "Engg"),
+        (["Alice", "Charlie"], "Company"),
+        (["David", "Eve"], "Sales"),
+        (["Alice"], "Backend"),
+        (["Mike", "Lisa"], "Engg"),
+        (["Alice", "David"], "Company"),
+    ]
+    
+    for employees, expected in test_cases:
+        result = find_closest_group_simple(hierarchy, employees)
+        status = "✓" if result == expected else "✗"
+        print(f"\n{status} Input: {employees}")
+        print(f"  Expected: {expected}, Got: {result}")
+    
+    # Show internal paths for debugging
+    print("\n" + "=" * 50)
+    print("PATH TRACING EXAMPLE (for Alice and Lisa)")
+    print("=" * 50)
+    
+    # Rebuild parent map for demo
+    parent_map = {}
+    def build_map(data, parent_name):
+        if isinstance(data, dict):
+            for group, content in data.items():
+                parent_map[group] = parent_name
+                build_map(content, group)
+        elif isinstance(data, list):
+            for emp in data:
+                parent_map[emp] = parent_name
+    
+    build_map(hierarchy, "Company")
+    
+    def get_path(node):
+        path = []
+        while node:
+            path.append(node)
+            node = parent_map.get(node)
+        return path[::-1]
+    
+    alice_path = get_path("Alice")
+    lisa_path = get_path("Lisa")
+    
+    print(f"\nAlice path: {' → '.join(alice_path)}")
+    print(f"Lisa path:  {' → '.join(lisa_path)}")
+    print(f"\nCommon Prefix: ", end="")
+    
+    for i in range(min(len(alice_path), len(lisa_path))):
+        if alice_path[i] == lisa_path[i]:
+            print(f"{alice_path[i]}", end="")
+            if i < min(len(alice_path), len(lisa_path)) - 1:
+                print(" → ", end="")
+        else:
+            break
+    
+    print(f"\nLCA: {find_closest_group_simple(hierarchy, ['Alice', 'Lisa'])}")
+    
+    print("\n" + "=" * 50)
+    print("PARENT MAP (for debugging)")
+    print("=" * 50)
+    for child, parent in sorted(parent_map.items()):
+        print(f"  {child:15} → {parent}")
 ```
 
 ---
