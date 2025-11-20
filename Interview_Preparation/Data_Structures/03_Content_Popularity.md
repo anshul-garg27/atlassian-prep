@@ -899,12 +899,12 @@ When we add a key:
 - When we query: next(reversed(node.keys)) → gets last inserted
 ```
 
-**Implementation:**
+**Complete Implementation:**
 
 ```python
-from typing import Optional
+from typing import Optional, Dict
 
-class RecencyNode(Node):
+class RecencyNode:
     """
     Enhanced Node that maintains insertion order of keys.
     Uses dict instead of set to track when items reached this popularity.
@@ -932,24 +932,96 @@ class RecencyNode(Node):
         return next(reversed(self.keys)) if self.keys else None
 
 
-class RecencyTracker(PopularityTracker):
+class RecencyTracker:
     """
-    Popularity tracker that returns the most recently updated item
-    when multiple items have the same max popularity.
+    O(1) Content Popularity Tracker with recency-based tie-breaking.
+    Returns the most recently updated item when multiple items have max popularity.
     """
+
+    def __init__(self):
+        # Map: contentId -> Node (bucket)
+        self.key_to_node: Dict[str, RecencyNode] = {}
+
+        # DLL Sentinels
+        self.head = RecencyNode(float('-inf'))  # Min sentinel
+        self.tail = RecencyNode(float('inf'))   # Max sentinel
+        self.head.next = self.tail
+        self.tail.prev = self.head
 
     def _add_node_after(self, prev_node: RecencyNode, count: int) -> RecencyNode:
-        """Create and insert a RecencyNode after prev_node."""
+        """Create and insert a new node after prev_node."""
         new_node = RecencyNode(count)
-        next_node = prev_node.next
-
-        # Link new node into DLL
-        prev_node.next = new_node
         new_node.prev = prev_node
-        new_node.next = next_node
-        next_node.prev = new_node
-
+        new_node.next = prev_node.next
+        prev_node.next.prev = new_node
+        prev_node.next = new_node
         return new_node
+
+    def _remove_node(self, node: RecencyNode):
+        """Remove a node from DLL."""
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def increasePopularity(self, key: str) -> None:
+        """
+        Increase count for key by 1.
+        Time: O(1)
+        """
+        if key in self.key_to_node:
+            current_node = self.key_to_node[key]
+            new_count = current_node.count + 1
+
+            # Check if next bucket exists
+            next_node = current_node.next
+            if next_node.count != new_count:
+                next_node = self._add_node_after(current_node, new_count)
+
+            # Move key
+            next_node.add_key(key)
+            self.key_to_node[key] = next_node
+            current_node.remove_key(key)
+
+            # Clean up
+            if current_node.is_empty():
+                self._remove_node(current_node)
+        else:
+            # New key: Add to bucket 1
+            first_node = self.head.next
+            if first_node.count != 1:
+                first_node = self._add_node_after(self.head, 1)
+
+            first_node.add_key(key)
+            self.key_to_node[key] = first_node
+
+    def decreasePopularity(self, key: str) -> None:
+        """
+        Decrease count for key by 1.
+        Time: O(1)
+        """
+        if key not in self.key_to_node:
+            return  # Ignore if not found
+
+        current_node = self.key_to_node[key]
+        new_count = current_node.count - 1
+
+        # Remove from current
+        current_node.remove_key(key)
+
+        if new_count == 0:
+            # Remove completely
+            del self.key_to_node[key]
+        else:
+            # Move to prev bucket
+            prev_node = current_node.prev
+            if prev_node.count != new_count:
+                prev_node = self._add_node_after(current_node.prev, new_count)
+
+            prev_node.add_key(key)
+            self.key_to_node[key] = prev_node
+
+        # Clean up
+        if current_node.is_empty():
+            self._remove_node(current_node)
 
     def mostPopular(self) -> Optional[str]:
         """
@@ -959,6 +1031,21 @@ class RecencyTracker(PopularityTracker):
         if self.tail.prev == self.head:
             return None  # Empty tracker
         return self.tail.prev.get_newest_key()  # Most recent in max bucket
+
+
+# ============================================
+# USAGE EXAMPLE
+# ============================================
+if __name__ == "__main__":
+    tracker = RecencyTracker()
+
+    # Add items
+    tracker.increasePopularity("A")  # A:1
+    tracker.increasePopularity("B")  # B:1
+    tracker.increasePopularity("A")  # A:2 (moved to bucket 2 first)
+    tracker.increasePopularity("B")  # B:2 (moved to bucket 2 second)
+
+    print(tracker.mostPopular())  # Output: "B" (most recently updated)
 ```
 
 **Example Trace:**
@@ -1022,13 +1109,136 @@ Step 2: Need 1 more, current = Count:5, take {B} → result = [A, E, B]
 Return: [A, E, B]  (top 3 by popularity)
 ```
 
-**Implementation:**
+**Complete Implementation:**
 
 ```python
-class PopularityTracker:
-    # ... existing methods ...
+from typing import Optional, Set, Dict, List, Tuple
 
-    def getTopK(self, k: int) -> list:
+class Node:
+    """
+    A Bucket in the Doubly Linked List.
+    Represents a specific popularity count.
+    """
+    def __init__(self, count: int = 0):
+        self.count = count
+        self.keys: Set[str] = set()  # Items with this popularity
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+
+    def add_key(self, key: str):
+        self.keys.add(key)
+
+    def remove_key(self, key: str):
+        self.keys.remove(key)
+
+    def is_empty(self):
+        return len(self.keys) == 0
+
+    def get_any_key(self):
+        """Return one key from the set (for mostPopular)."""
+        return next(iter(self.keys)) if self.keys else None
+
+
+class PopularityTracker:
+    """
+    O(1) Content Popularity Tracker with Top-K support.
+    """
+
+    def __init__(self):
+        # Map: contentId -> Node (bucket)
+        self.key_to_node: Dict[str, Node] = {}
+
+        # DLL Sentinels
+        self.head = Node(float('-inf'))  # Min sentinel
+        self.tail = Node(float('inf'))   # Max sentinel
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+    def _add_node_after(self, prev_node: Node, count: int) -> Node:
+        """Create and insert a new node after prev_node."""
+        new_node = Node(count)
+        new_node.prev = prev_node
+        new_node.next = prev_node.next
+        prev_node.next.prev = new_node
+        prev_node.next = new_node
+        return new_node
+
+    def _remove_node(self, node: Node):
+        """Remove a node from DLL."""
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def increasePopularity(self, key: str) -> None:
+        """
+        Increase count for key by 1.
+        Time: O(1)
+        """
+        if key in self.key_to_node:
+            current_node = self.key_to_node[key]
+            new_count = current_node.count + 1
+
+            # Check if next bucket exists
+            next_node = current_node.next
+            if next_node.count != new_count:
+                next_node = self._add_node_after(current_node, new_count)
+
+            # Move key
+            next_node.add_key(key)
+            self.key_to_node[key] = next_node
+            current_node.remove_key(key)
+
+            # Clean up
+            if current_node.is_empty():
+                self._remove_node(current_node)
+        else:
+            # New key: Add to bucket 1
+            first_node = self.head.next
+            if first_node.count != 1:
+                first_node = self._add_node_after(self.head, 1)
+
+            first_node.add_key(key)
+            self.key_to_node[key] = first_node
+
+    def decreasePopularity(self, key: str) -> None:
+        """
+        Decrease count for key by 1.
+        Time: O(1)
+        """
+        if key not in self.key_to_node:
+            return  # Ignore if not found
+
+        current_node = self.key_to_node[key]
+        new_count = current_node.count - 1
+
+        # Remove from current
+        current_node.remove_key(key)
+
+        if new_count == 0:
+            # Remove completely
+            del self.key_to_node[key]
+        else:
+            # Move to prev bucket
+            prev_node = current_node.prev
+            if prev_node.count != new_count:
+                prev_node = self._add_node_after(current_node.prev, new_count)
+
+            prev_node.add_key(key)
+            self.key_to_node[key] = prev_node
+
+        # Clean up
+        if current_node.is_empty():
+            self._remove_node(current_node)
+
+    def mostPopular(self) -> Optional[str]:
+        """
+        Return key with max popularity.
+        Time: O(1)
+        """
+        if self.tail.prev == self.head:
+            return None  # Empty
+        return self.tail.prev.get_any_key()
+
+    def getTopK(self, k: int) -> List[str]:
         """
         Return k most popular items in descending popularity order.
 
@@ -1063,14 +1273,20 @@ class PopularityTracker:
 
         return result
 
-    def getTopKWithCounts(self, k: int) -> list:
+    def getTopKWithCounts(self, k: int) -> List[Tuple[str, int]]:
         """
         Return k most popular items WITH their popularity counts.
+
+        Args:
+            k: Number of top items to return
 
         Returns:
             List of (content_id, count) tuples
 
         Example: [("A", 10), ("B", 8), ("C", 8)]
+
+        Time: O(B + K) where B = number of buckets traversed
+        Space: O(K) for result list
         """
         if k <= 0:
             return []
@@ -1089,24 +1305,28 @@ class PopularityTracker:
             current = current.prev
 
         return result
-```
 
-**Example Usage:**
 
-```python
-tracker = PopularityTracker()
+# ============================================
+# USAGE EXAMPLE
+# ============================================
+if __name__ == "__main__":
+    tracker = PopularityTracker()
 
-# Setup: A:5, B:3, C:3, D:1
-for _ in range(5): tracker.increasePopularity("A")
-for _ in range(3): tracker.increasePopularity("B")
-for _ in range(3): tracker.increasePopularity("C")
-tracker.increasePopularity("D")
+    # Setup: A:5, B:3, C:3, D:1
+    for _ in range(5):
+        tracker.increasePopularity("A")
+    for _ in range(3):
+        tracker.increasePopularity("B")
+    for _ in range(3):
+        tracker.increasePopularity("C")
+    tracker.increasePopularity("D")
 
-print(tracker.getTopK(2))
-# Output: ["A", "B"] or ["A", "C"] (A is always first, B/C are tied)
+    print("Top 2:", tracker.getTopK(2))
+    # Output: ["A", "B"] or ["A", "C"] (A is always first, B/C are tied)
 
-print(tracker.getTopKWithCounts(3))
-# Output: [("A", 5), ("B", 3), ("C", 3)]
+    print("Top 3 with counts:", tracker.getTopKWithCounts(3))
+    # Output: [("A", 5), ("B", 3), ("C", 3)]
 ```
 
 **Complexity Analysis:**
@@ -1138,42 +1358,142 @@ Multiple threads could:
 
 Since all operations are O(1) and very fast, using a single lock for the entire data structure is efficient and prevents deadlocks.
 
-**Implementation:**
+**Complete Implementation (Coarse-Grained Locking):**
 
 ```python
 import threading
-from typing import Optional
+from typing import Optional, Set, Dict, List
 
-class ThreadSafeTracker(PopularityTracker):
+class Node:
     """
-    Thread-safe version of PopularityTracker using coarse-grained locking.
+    A Bucket in the Doubly Linked List.
+    Represents a specific popularity count.
+    """
+    def __init__(self, count: int = 0):
+        self.count = count
+        self.keys: Set[str] = set()
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+
+    def add_key(self, key: str):
+        self.keys.add(key)
+
+    def remove_key(self, key: str):
+        self.keys.remove(key)
+
+    def is_empty(self):
+        return len(self.keys) == 0
+
+    def get_any_key(self):
+        return next(iter(self.keys)) if self.keys else None
+
+
+class ThreadSafeTracker:
+    """
+    Thread-safe Content Popularity Tracker using coarse-grained locking.
+    All operations are O(1) with lock acquisition overhead.
     Suitable for high-concurrency web applications.
     """
 
     def __init__(self):
-        super().__init__()
+        # Map: contentId -> Node (bucket)
+        self.key_to_node: Dict[str, Node] = {}
+
+        # DLL Sentinels
+        self.head = Node(float('-inf'))
+        self.tail = Node(float('inf'))
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+        # Single lock for entire data structure
         self.lock = threading.Lock()
-        # Alternative: threading.RLock() for reentrant locking
+
+    def _add_node_after(self, prev_node: Node, count: int) -> Node:
+        """Create and insert a new node after prev_node."""
+        new_node = Node(count)
+        new_node.prev = prev_node
+        new_node.next = prev_node.next
+        prev_node.next.prev = new_node
+        prev_node.next = new_node
+        return new_node
+
+    def _remove_node(self, node: Node):
+        """Remove a node from DLL."""
+        node.prev.next = node.next
+        node.next.prev = node.prev
 
     def increasePopularity(self, key: str) -> None:
         """Thread-safe increase operation."""
         with self.lock:
-            super().increasePopularity(key)
+            if key in self.key_to_node:
+                current_node = self.key_to_node[key]
+                new_count = current_node.count + 1
+
+                next_node = current_node.next
+                if next_node.count != new_count:
+                    next_node = self._add_node_after(current_node, new_count)
+
+                next_node.add_key(key)
+                self.key_to_node[key] = next_node
+                current_node.remove_key(key)
+
+                if current_node.is_empty():
+                    self._remove_node(current_node)
+            else:
+                first_node = self.head.next
+                if first_node.count != 1:
+                    first_node = self._add_node_after(self.head, 1)
+
+                first_node.add_key(key)
+                self.key_to_node[key] = first_node
 
     def decreasePopularity(self, key: str) -> None:
         """Thread-safe decrease operation."""
         with self.lock:
-            super().decreasePopularity(key)
+            if key not in self.key_to_node:
+                return
+
+            current_node = self.key_to_node[key]
+            new_count = current_node.count - 1
+
+            current_node.remove_key(key)
+
+            if new_count == 0:
+                del self.key_to_node[key]
+            else:
+                prev_node = current_node.prev
+                if prev_node.count != new_count:
+                    prev_node = self._add_node_after(current_node.prev, new_count)
+
+                prev_node.add_key(key)
+                self.key_to_node[key] = prev_node
+
+            if current_node.is_empty():
+                self._remove_node(current_node)
 
     def mostPopular(self) -> Optional[str]:
         """Thread-safe query operation."""
         with self.lock:
-            return super().mostPopular()
+            if self.tail.prev == self.head:
+                return None
+            return self.tail.prev.get_any_key()
 
-    def getTopK(self, k: int) -> list:
+    def getTopK(self, k: int) -> List[str]:
         """Thread-safe top-k query."""
         with self.lock:
-            return super().getTopK(k)
+            if k <= 0:
+                return []
+
+            result = []
+            current = self.tail.prev
+
+            while current != self.head and len(result) < k:
+                bucket_items = list(current.keys)
+                needed = k - len(result)
+                result.extend(bucket_items[:needed])
+                current = current.prev
+
+            return result
 
     def getCount(self, key: str) -> int:
         """
@@ -1184,48 +1504,244 @@ class ThreadSafeTracker(PopularityTracker):
             if key not in self.key_to_node:
                 return 0
             return self.key_to_node[key].count
+
+
+# ============================================
+# USAGE EXAMPLE
+# ============================================
+if __name__ == "__main__":
+    import concurrent.futures
+
+    tracker = ThreadSafeTracker()
+
+    # Simulate concurrent updates from 10 threads
+    def worker(content_id: str, num_increments: int):
+        for _ in range(num_increments):
+            tracker.increasePopularity(content_id)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [
+            executor.submit(worker, "video1", 100),
+            executor.submit(worker, "video2", 150),
+            executor.submit(worker, "video3", 120),
+        ]
+        concurrent.futures.wait(futures)
+
+    print("Most Popular:", tracker.mostPopular())
+    print("Top 3:", tracker.getTopK(3))
 ```
 
 **Alternative: Fine-Grained Locking (Advanced)**
 
-For extremely high concurrency, we could use a Read-Write Lock:
+For extremely high concurrency with read-heavy workloads (90%+ reads), we can use a Read-Write Lock to allow concurrent reads:
 
 ```python
 import threading
+from typing import Optional, Set, Dict, List
 
-class RWLockTracker(PopularityTracker):
+class Node:
+    """Bucket node for DLL."""
+    def __init__(self, count: int = 0):
+        self.count = count
+        self.keys: Set[str] = set()
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+
+    def add_key(self, key: str):
+        self.keys.add(key)
+
+    def remove_key(self, key: str):
+        self.keys.remove(key)
+
+    def is_empty(self):
+        return len(self.keys) == 0
+
+    def get_any_key(self):
+        return next(iter(self.keys)) if self.keys else None
+
+
+class RWLockTracker:
     """
-    Read-Write Lock version for high read concurrency.
+    Read-Write Lock Popularity Tracker.
     Multiple readers can query simultaneously.
     Writers get exclusive access.
+    Best for read-heavy workloads (90%+ reads).
     """
 
     def __init__(self):
-        super().__init__()
-        from threading import Lock, Condition
+        # Map: contentId -> Node
+        self.key_to_node: Dict[str, Node] = {}
 
-        self.read_ready = Condition(Lock())
-        self.readers = 0
+        # DLL Sentinels
+        self.head = Node(float('-inf'))
+        self.tail = Node(float('inf'))
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+        # RW Lock implementation
+        self._read_ready = threading.Condition(threading.Lock())
+        self._readers = 0
+        self._writer = False
+
+    def _add_node_after(self, prev_node: Node, count: int) -> Node:
+        """Create and insert a new node after prev_node."""
+        new_node = Node(count)
+        new_node.prev = prev_node
+        new_node.next = prev_node.next
+        prev_node.next.prev = new_node
+        prev_node.next = new_node
+        return new_node
+
+    def _remove_node(self, node: Node):
+        """Remove a node from DLL."""
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def _acquire_read(self):
+        """Acquire read lock (shared)."""
+        with self._read_ready:
+            while self._writer:
+                self._read_ready.wait()
+            self._readers += 1
+
+    def _release_read(self):
+        """Release read lock."""
+        with self._read_ready:
+            self._readers -= 1
+            if self._readers == 0:
+                self._read_ready.notify_all()
+
+    def _acquire_write(self):
+        """Acquire write lock (exclusive)."""
+        with self._read_ready:
+            while self._writer or self._readers > 0:
+                self._read_ready.wait()
+            self._writer = True
+
+    def _release_write(self):
+        """Release write lock."""
+        with self._read_ready:
+            self._writer = False
+            self._read_ready.notify_all()
 
     def increasePopularity(self, key: str) -> None:
-        # Acquire write lock (exclusive)
-        with self.read_ready:
-            while self.readers > 0:
-                self.read_ready.wait()
-            super().increasePopularity(key)
+        """Write operation: exclusive lock."""
+        self._acquire_write()
+        try:
+            if key in self.key_to_node:
+                current_node = self.key_to_node[key]
+                new_count = current_node.count + 1
+
+                next_node = current_node.next
+                if next_node.count != new_count:
+                    next_node = self._add_node_after(current_node, new_count)
+
+                next_node.add_key(key)
+                self.key_to_node[key] = next_node
+                current_node.remove_key(key)
+
+                if current_node.is_empty():
+                    self._remove_node(current_node)
+            else:
+                first_node = self.head.next
+                if first_node.count != 1:
+                    first_node = self._add_node_after(self.head, 1)
+
+                first_node.add_key(key)
+                self.key_to_node[key] = first_node
+        finally:
+            self._release_write()
+
+    def decreasePopularity(self, key: str) -> None:
+        """Write operation: exclusive lock."""
+        self._acquire_write()
+        try:
+            if key not in self.key_to_node:
+                return
+
+            current_node = self.key_to_node[key]
+            new_count = current_node.count - 1
+
+            current_node.remove_key(key)
+
+            if new_count == 0:
+                del self.key_to_node[key]
+            else:
+                prev_node = current_node.prev
+                if prev_node.count != new_count:
+                    prev_node = self._add_node_after(current_node.prev, new_count)
+
+                prev_node.add_key(key)
+                self.key_to_node[key] = prev_node
+
+            if current_node.is_empty():
+                self._remove_node(current_node)
+        finally:
+            self._release_write()
 
     def mostPopular(self) -> Optional[str]:
-        # Acquire read lock (shared)
-        with self.read_ready:
-            self.readers += 1
-
+        """Read operation: shared lock (concurrent reads allowed)."""
+        self._acquire_read()
         try:
-            return super().mostPopular()
+            if self.tail.prev == self.head:
+                return None
+            return self.tail.prev.get_any_key()
         finally:
-            with self.read_ready:
-                self.readers -= 1
-                if self.readers == 0:
-                    self.read_ready.notify_all()
+            self._release_read()
+
+    def getTopK(self, k: int) -> List[str]:
+        """Read operation: shared lock (concurrent reads allowed)."""
+        self._acquire_read()
+        try:
+            if k <= 0:
+                return []
+
+            result = []
+            current = self.tail.prev
+
+            while current != self.head and len(result) < k:
+                bucket_items = list(current.keys)
+                needed = k - len(result)
+                result.extend(bucket_items[:needed])
+                current = current.prev
+
+            return result
+        finally:
+            self._release_read()
+
+
+# ============================================
+# USAGE EXAMPLE
+# ============================================
+if __name__ == "__main__":
+    import concurrent.futures
+    import time
+
+    tracker = RWLockTracker()
+
+    # Setup initial data
+    for i in range(10):
+        tracker.increasePopularity(f"video{i}")
+
+    # Simulate read-heavy workload (95% reads, 5% writes)
+    def reader_worker():
+        for _ in range(100):
+            tracker.mostPopular()
+            tracker.getTopK(5)
+
+    def writer_worker():
+        for i in range(5):
+            tracker.increasePopularity(f"video{i}")
+
+    start = time.time()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        # 19 readers, 1 writer
+        futures = [executor.submit(reader_worker) for _ in range(19)]
+        futures.append(executor.submit(writer_worker))
+        concurrent.futures.wait(futures)
+
+    print(f"Completed in {time.time() - start:.2f}s")
+    print("Most Popular:", tracker.mostPopular())
 ```
 
 **Complexity Analysis:**
