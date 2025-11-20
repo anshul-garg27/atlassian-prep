@@ -701,6 +701,204 @@ Final Assignment:
 
 ---
 
+## 📝 Solution 0: Ultra-Simplified (Interview-Ready, No Classes)
+
+**Perfect for 20-30 minute interviews!** Uses only built-in types and heapq.
+
+```python
+import heapq
+from typing import List, Tuple
+
+# Global state for simplified version (or can pass as parameters)
+def assign_courts_simple(bookings: List[Tuple[int, int]]) -> int:
+    """
+    Find minimum number of courts needed for bookings.
+    
+    Args:
+        bookings: List of (start, finish) tuples
+    
+    Returns:
+        Number of courts needed
+    
+    Time: O(N log N) for sorting + O(N log K) for heap operations
+    Space: O(K) where K = number of courts
+    
+    Algorithm:
+    1. Sort bookings by start time
+    2. Use min-heap to track when each court becomes free
+    3. For each booking:
+       - If earliest free court is available, reuse it
+       - Otherwise, need a new court
+    """
+    if not bookings:
+        return 0
+    
+    # Sort by start time
+    sorted_bookings = sorted(bookings, key=lambda x: x[0])
+    
+    # Min-heap: stores finish times of courts
+    # heap[0] = earliest time a court becomes available
+    heap = []
+    
+    for start, finish in sorted_bookings:
+        # If heap is not empty and earliest available court is free
+        if heap and heap[0] <= start:
+            # Reuse this court (remove old finish time)
+            heapq.heappop(heap)
+        
+        # Add this booking's finish time to heap
+        # (Either reusing a court or allocating new one)
+        heapq.heappush(heap, finish)
+    
+    # Heap size = number of courts needed
+    return len(heap)
+
+
+def assign_courts_with_details(bookings: List[Tuple[int, int, str]]) -> dict:
+    """
+    Enhanced version that returns court assignments.
+    
+    Args:
+        bookings: List of (start, finish, booking_id) tuples
+    
+    Returns:
+        {
+            "num_courts": int,
+            "assignments": {court_id: [booking_ids]}
+        }
+    
+    Time: O(N log N)
+    Space: O(N)
+    """
+    if not bookings:
+        return {"num_courts": 0, "assignments": {}}
+    
+    # Sort by start time
+    sorted_bookings = sorted(bookings, key=lambda x: x[0])
+    
+    # Min-heap: (finish_time, court_id)
+    heap = []
+    
+    # Track assignments: court_id -> list of booking_ids
+    assignments = {}
+    next_court_id = 1
+    
+    for start, finish, booking_id in sorted_bookings:
+        if heap and heap[0][0] <= start:
+            # Reuse existing court
+            old_finish, court_id = heapq.heappop(heap)
+            assignments[court_id].append(booking_id)
+            heapq.heappush(heap, (finish, court_id))
+        else:
+            # Need new court
+            court_id = next_court_id
+            next_court_id += 1
+            assignments[court_id] = [booking_id]
+            heapq.heappush(heap, (finish, court_id))
+    
+    return {
+        "num_courts": len(set(cid for _, cid in heap)),
+        "assignments": assignments
+    }
+
+
+# --- Runnable Example for Interview ---
+if __name__ == "__main__":
+    print("=" * 60)
+    print("TENNIS COURT BOOKING - ULTRA-SIMPLIFIED (NO CLASSES)")
+    print("=" * 60)
+    
+    # Test 1: Overlapping bookings
+    print("\n[Test 1] Overlapping Bookings")
+    bookings1 = [
+        (0, 30),   # Booking A
+        (10, 20),  # Booking B
+        (15, 45),  # Booking C
+        (50, 70)   # Booking D
+    ]
+    courts_needed = assign_courts_simple(bookings1)
+    print(f"Bookings: {bookings1}")
+    print(f"Courts needed: {courts_needed}")
+    print(f"Expected: 3 (peak overlap at t=15)")
+    
+    # Test 2: Sequential (no overlap)
+    print("\n[Test 2] Sequential Bookings")
+    bookings2 = [
+        (0, 10),
+        (10, 20),
+        (20, 30)
+    ]
+    courts_needed = assign_courts_simple(bookings2)
+    print(f"Bookings: {bookings2}")
+    print(f"Courts needed: {courts_needed}")
+    print(f"Expected: 1 (all can use same court)")
+    
+    # Test 3: All overlap (worst case)
+    print("\n[Test 3] All Overlap")
+    bookings3 = [
+        (0, 100),
+        (10, 90),
+        (20, 80),
+        (30, 70)
+    ]
+    courts_needed = assign_courts_simple(bookings3)
+    print(f"Bookings: {bookings3}")
+    print(f"Courts needed: {courts_needed}")
+    print(f"Expected: 4 (all overlap)")
+    
+    # Test 4: With detailed assignments
+    print("\n[Test 4] Detailed Assignments")
+    bookings4 = [
+        (0, 30, "A"),
+        (10, 20, "B"),
+        (15, 45, "C"),
+        (50, 70, "D")
+    ]
+    result = assign_courts_with_details(bookings4)
+    print(f"Courts needed: {result['num_courts']}")
+    print(f"Assignments:")
+    for court_id in sorted(result['assignments'].keys()):
+        print(f"  Court {court_id}: {result['assignments'][court_id]}")
+    
+    # Test 5: Edge cases
+    print("\n[Test 5] Edge Cases")
+    print(f"Empty: {assign_courts_simple([])}")  # 0
+    print(f"Single: {assign_courts_simple([(5, 10)])}")  # 1
+    
+    # Test 6: Out of order input
+    print("\n[Test 6] Out of Order Input")
+    bookings6 = [
+        (50, 70),   # Last chronologically
+        (10, 20),   # Second
+        (0, 30),    # First
+        (15, 45)    # Third
+    ]
+    courts_needed = assign_courts_simple(bookings6)
+    print(f"Bookings (unsorted): {bookings6}")
+    print(f"Courts needed: {courts_needed}")
+    print(f"Expected: 3 (algorithm sorts them)")
+
+    print("\n" + "=" * 60)
+    print("Ultra-Simplified tests passed! ✓")
+    print("=" * 60)
+    print("\n💡 Key Points:")
+    print("  • Heap size = number of courts")
+    print("  • Heap top = earliest available court")
+    print("  • Sort bookings first!")
+    print("  • Can write in 15-20 minutes")
+```
+
+**Why This Is Perfect for Interviews:**
+- ✅ **No classes** - Just pure functions
+- ✅ **Standard library only** - heapq is built-in
+- ✅ **15-20 minutes** - Can write from scratch quickly
+- ✅ **Easy to explain** - Greedy algorithm is intuitive
+- ✅ **Correct complexity** - O(N log N) optimal
+
+**Trade-off:** Uses simple tuples instead of objects. For production, use the class-based solution below.
+
+---
+
 ## 📝 Complete Solution: Greedy with Min-Heap
 
 ```python

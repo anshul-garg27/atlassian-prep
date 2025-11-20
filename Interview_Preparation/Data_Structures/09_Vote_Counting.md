@@ -1147,6 +1147,190 @@ class LiveLeaderboard:
             reverse=True
         )
         return candidates[:k]
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    from collections import Counter
+    from typing import List, Tuple, Optional
+    
+    class LiveLeaderboard:
+        """
+        Maintain live voting results.
+        
+        Supports real-time vote casting and querying.
+        """
+        
+        def __init__(self):
+            self.counts = Counter()
+            self.total_votes = 0
+        
+        def cast_vote(self, candidate: str) -> None:
+            """
+            Add a vote.
+            
+            Time: O(1)
+            Space: O(1)
+            """
+            self.counts[candidate] += 1
+            self.total_votes += 1
+        
+        def get_leader(self) -> Optional[str]:
+            """
+            Get current leader.
+            
+            Time: O(C) where C = unique candidates
+            Space: O(1)
+            """
+            if not self.counts:
+                return None
+            return max(self.counts, key=self.counts.get)
+        
+        def get_top_k(self, k: int) -> List[Tuple[str, int]]:
+            """
+            Get current top K.
+            
+            Time: O(C log C)
+            Space: O(C)
+            """
+            candidates = sorted(
+                self.counts.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            return candidates[:k]
+        
+        def get_stats(self) -> dict:
+            """Get comprehensive voting statistics."""
+            if not self.counts:
+                return {"total_votes": 0, "candidates": 0}
+            
+            leader = self.get_leader()
+            leader_votes = self.counts[leader]
+            
+            return {
+                "total_votes": self.total_votes,
+                "candidates": len(self.counts),
+                "leader": leader,
+                "leader_votes": leader_votes,
+                "leader_percentage": (leader_votes / self.total_votes * 100) if self.total_votes > 0 else 0
+            }
+    
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 1: STREAMING VOTES (LIVE LEADERBOARD)")
+    print("=" * 70)
+    
+    leaderboard = LiveLeaderboard()
+    
+    # Simulate streaming votes
+    vote_stream = [
+        "Alice", "Bob", "Alice", "Charlie",
+        "Bob", "Alice", "David", "Bob",
+        "Charlie", "Alice", "Bob", "Alice"
+    ]
+    
+    print("\n📊 Processing vote stream in real-time...")
+    print("-" * 70)
+    
+    # Process votes and show leader after every 3 votes
+    for i, vote in enumerate(vote_stream, 1):
+        leaderboard.cast_vote(vote)
+        
+        if i % 3 == 0 or i == len(vote_stream):
+            stats = leaderboard.get_stats()
+            print(f"\n📍 After vote #{i}: '{vote}'")
+            print(f"  Current Leader: {stats['leader']} ({stats['leader_votes']} votes, {stats['leader_percentage']:.1f}%)")
+            print(f"  Total Votes: {stats['total_votes']}")
+            print(f"  Candidates: {stats['candidates']}")
+            
+            # Show top 3
+            top_3 = leaderboard.get_top_k(3)
+            print(f"  Top 3:")
+            for rank, (candidate, count) in enumerate(top_3, 1):
+                print(f"    {rank}. {candidate}: {count} votes")
+    
+    # Final results
+    print("\n" + "=" * 70)
+    print("🏆 FINAL RESULTS")
+    print("=" * 70)
+    
+    stats = leaderboard.get_stats()
+    print(f"\nTotal Votes Cast: {stats['total_votes']}")
+    print(f"Winner: {stats['leader']} with {stats['leader_votes']} votes ({stats['leader_percentage']:.1f}%)")
+    
+    print(f"\nFull Leaderboard:")
+    for rank, (candidate, count) in enumerate(leaderboard.get_top_k(10), 1):
+        percentage = (count / stats['total_votes'] * 100)
+        bar = "█" * int(percentage)
+        print(f"  {rank}. {candidate:10} {count:3} votes ({percentage:5.1f}%) {bar}")
+    
+    # Test 2: Live updates with leader changes
+    print("\n" + "=" * 70)
+    print("⚡ Demonstrating Leader Changes")
+    print("=" * 70)
+    
+    board2 = LiveLeaderboard()
+    
+    print("\n📍 Vote-by-vote analysis:")
+    print("-" * 70)
+    
+    votes_sequence = ["Alice", "Bob", "Alice", "Bob", "Alice", "Bob", "Bob"]
+    prev_leader = None
+    
+    for i, vote in enumerate(votes_sequence, 1):
+        board2.cast_vote(vote)
+        current_leader = board2.get_leader()
+        leader_changed = (current_leader != prev_leader)
+        
+        change_indicator = "⚡ LEADER CHANGED!" if leader_changed and prev_leader else ""
+        
+        print(f"\nVote #{i}: '{vote}' {change_indicator}")
+        print(f"  Counts: {dict(board2.counts)}")
+        print(f"  Leader: {current_leader}")
+        
+        prev_leader = current_leader
+    
+    # Test 3: High-throughput simulation
+    print("\n" + "=" * 70)
+    print("🚀 High-Throughput Simulation")
+    print("=" * 70)
+    
+    import random
+    import time
+    
+    board3 = LiveLeaderboard()
+    candidates = ["Alice", "Bob", "Charlie", "David", "Eve"]
+    
+    print(f"\nSimulating 10,000 votes...")
+    start_time = time.time()
+    
+    for _ in range(10000):
+        vote = random.choice(candidates)
+        board3.cast_vote(vote)
+    
+    end_time = time.time()
+    elapsed = end_time - start_time
+    
+    print(f"✅ Processed 10,000 votes in {elapsed:.4f} seconds")
+    print(f"   Throughput: {10000 / elapsed:.0f} votes/second")
+    
+    print(f"\nFinal Top 5:")
+    for rank, (candidate, count) in enumerate(board3.get_top_k(5), 1):
+        percentage = (count / 10000 * 100)
+        print(f"  {rank}. {candidate}: {count} votes ({percentage:.1f}%)")
+    
+    print("\n" + "=" * 70)
+    print("✅ Streaming votes test complete!")
+    print("=" * 70)
+    
+    print("\n💡 Key Benefits:")
+    print("  • O(1) vote casting (instant)")
+    print("  • O(C) leader query (fast)")
+    print("  • Real-time results (no batch processing)")
+    print("  • Scalable to millions of votes")
 ```
 
 ---
@@ -1202,6 +1386,224 @@ def instant_runoff(ballots: List[List[str]]) -> str:
         active.remove(eliminated)
     
     return list(active)[0]
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    from collections import Counter
+    from typing import List
+    
+    def instant_runoff(ballots: List[List[str]]) -> str:
+        """
+        Implement instant runoff voting (IRV).
+        
+        Algorithm:
+        1. Count 1st-choice votes
+        2. If someone has >50%, they win
+        3. Otherwise, eliminate lowest candidate
+        4. Redistribute votes to next choice
+        5. Repeat until winner found
+        
+        Args:
+            ballots: List of ranked ballots (1st choice first)
+        
+        Returns:
+            Winner's name
+        
+        Time: O(R × C × B) where R=rounds, C=candidates, B=ballots
+        Space: O(C)
+        """
+        active = set()
+        for ballot in ballots:
+            active.update(ballot)
+        
+        round_num = 1
+        
+        while len(active) > 1:
+            # Count current top choices
+            counts = Counter()
+            for ballot in ballots:
+                # Find first active candidate on this ballot
+                for candidate in ballot:
+                    if candidate in active:
+                        counts[candidate] += 1
+                        break
+            
+            # Check for majority
+            total = sum(counts.values())
+            for candidate, count in counts.items():
+                if count > total / 2:
+                    return candidate
+            
+            # Eliminate candidate with fewest votes
+            min_count = min(counts.values())
+            eliminated = [c for c, count in counts.items() if count == min_count][0]
+            active.remove(eliminated)
+            
+            round_num += 1
+        
+        return list(active)[0]
+    
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 2: RANKED CHOICE VOTING (INSTANT RUNOFF)")
+    print("=" * 70)
+    
+    # Test 1: Clear majority winner (no elimination needed)
+    print("\n[Test 1] Clear Majority Winner")
+    print("-" * 70)
+    
+    ballots1 = [
+        ["Alice", "Bob", "Charlie"],
+        ["Alice", "Charlie", "Bob"],
+        ["Alice", "Bob", "Charlie"],
+        ["Bob", "Alice", "Charlie"],
+        ["Charlie", "Alice", "Bob"]
+    ]
+    
+    print(f"\nBallots: {len(ballots1)} voters")
+    for i, ballot in enumerate(ballots1, 1):
+        print(f"  Voter {i}: {' > '.join(ballot)}")
+    
+    winner1 = instant_runoff(ballots1)
+    print(f"\n🏆 Winner: {winner1}")
+    print(f"   (Alice had 3/5 = 60% first-choice votes, majority!)")
+    
+    # Test 2: Requires elimination rounds
+    print("\n" + "=" * 70)
+    print("[Test 2] Multiple Elimination Rounds")
+    print("-" * 70)
+    
+    ballots2 = [
+        ["Alice", "Bob", "Charlie"],
+        ["Alice", "Charlie", "Bob"],
+        ["Bob", "Charlie", "Alice"],
+        ["Bob", "Alice", "Charlie"],
+        ["Charlie", "Alice", "Bob"],
+        ["Charlie", "Bob", "Alice"],
+        ["Charlie", "Alice", "Bob"]
+    ]
+    
+    print(f"\nBallots: {len(ballots2)} voters")
+    
+    # Show first-choice distribution
+    first_choices = Counter()
+    for ballot in ballots2:
+        first_choices[ballot[0]] += 1
+    
+    print(f"\nFirst-Choice Votes:")
+    for candidate, count in sorted(first_choices.items(), key=lambda x: -x[1]):
+        percentage = (count / len(ballots2) * 100)
+        bar = "█" * count
+        print(f"  {candidate:10} {count} votes ({percentage:5.1f}%) {bar}")
+    
+    print(f"\n📊 No candidate has majority (need >{len(ballots2)/2:.1f} votes)")
+    print(f"   → Elimination rounds will occur")
+    
+    winner2 = instant_runoff(ballots2)
+    print(f"\n🏆 Final Winner: {winner2}")
+    
+    # Test 3: Detailed round-by-round trace
+    print("\n" + "=" * 70)
+    print("[Test 3] Round-by-Round Trace")
+    print("-" * 70)
+    
+    ballots3 = [
+        ["Alice", "Bob", "Charlie"],
+        ["Alice", "Bob", "Charlie"],
+        ["Bob", "Charlie", "Alice"],
+        ["Bob", "Charlie", "Alice"],
+        ["Charlie", "Alice", "Bob"],
+    ]
+    
+    print(f"\nBallots: {len(ballots3)} voters")
+    for i, ballot in enumerate(ballots3, 1):
+        print(f"  Voter {i}: {' > '.join(ballot)}")
+    
+    # Manual trace
+    print(f"\n🔍 Manual Trace:")
+    print("-" * 70)
+    
+    active = set()
+    for ballot in ballots3:
+        active.update(ballot)
+    
+    round_num = 1
+    
+    while len(active) > 1:
+        counts = Counter()
+        for ballot in ballots3:
+            for candidate in ballot:
+                if candidate in active:
+                    counts[candidate] += 1
+                    break
+        
+        print(f"\nRound {round_num}:")
+        print(f"  Active candidates: {sorted(active)}")
+        print(f"  Vote counts:")
+        for candidate in sorted(counts.keys()):
+            count = counts[candidate]
+            percentage = (count / len(ballots3) * 100)
+            print(f"    {candidate:10} {count} votes ({percentage:5.1f}%)")
+        
+        total = sum(counts.values())
+        majority_threshold = total / 2
+        
+        # Check for winner
+        winner_found = False
+        for candidate, count in counts.items():
+            if count > majority_threshold:
+                print(f"\n  ✅ {candidate} has majority ({count} > {majority_threshold:.1f})")
+                print(f"  🏆 Winner: {candidate}")
+                winner_found = True
+                break
+        
+        if winner_found:
+            break
+        
+        # Eliminate
+        min_count = min(counts.values())
+        eliminated = [c for c, count in counts.items() if count == min_count][0]
+        print(f"\n  ❌ Eliminating {eliminated} ({min_count} votes, fewest)")
+        print(f"  → Votes redistribute to next choice")
+        
+        active.remove(eliminated)
+        round_num += 1
+    
+    # Test 4: Three-way tie scenario
+    print("\n" + "=" * 70)
+    print("[Test 4] Three-Way Competition")
+    print("-" * 70)
+    
+    ballots4 = [
+        ["Alice", "Bob", "Charlie"],
+        ["Alice", "Charlie", "Bob"],
+        ["Bob", "Alice", "Charlie"],
+        ["Bob", "Charlie", "Alice"],
+        ["Charlie", "Alice", "Bob"],
+        ["Charlie", "Bob", "Alice"],
+    ]
+    
+    print(f"\nBallots: {len(ballots4)} voters")
+    print(f"First-choice distribution:")
+    fc = Counter([b[0] for b in ballots4])
+    for candidate, count in sorted(fc.items()):
+        print(f"  {candidate}: {count} votes (tied!)")
+    
+    winner4 = instant_runoff(ballots4)
+    print(f"\n🏆 Winner after runoff: {winner4}")
+    
+    print("\n" + "=" * 70)
+    print("✅ Ranked choice voting test complete!")
+    print("=" * 70)
+    
+    print("\n💡 Key Insights:")
+    print("  • IRV ensures winner has majority support")
+    print("  • Eliminates 'spoiler effect' of third parties")
+    print("  • Voters can vote sincerely for favorite")
+    print("  • Used in Australia, San Francisco, Maine, etc.")
 ```
 
 ---

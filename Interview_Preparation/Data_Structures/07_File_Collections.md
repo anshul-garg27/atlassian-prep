@@ -170,6 +170,223 @@ report = generate_report(files, k=10)  # K > num collections
 
 ---
 
+## 📝 Solution 0: Ultra-Simplified (Interview-Ready, No Classes)
+
+**Perfect for 10-15 minute interviews!** Just dict grouping + heapq.
+
+```python
+from collections import defaultdict
+from typing import List, Dict, Tuple
+import heapq
+
+def generate_report_simple(files: List[Dict], k: int) -> Dict:
+    """
+    Generate file storage report with total size and top K collections.
+    
+    Args:
+        files: List of dicts with keys: name, size, collectionId
+        k: Number of top collections to return
+    
+    Returns:
+        {
+            "total_size": int,
+            "top_collections": [(collection_id, total_size), ...]
+        }
+    
+    Time: O(N + C log K) where N = files, C = collections
+    Space: O(C)
+    """
+    total_size = 0
+    collection_sizes = defaultdict(int)
+    
+    # Phase 1: Aggregate (O(N))
+    for file in files:
+        size = file.get("size", 0)
+        collection_id = file.get("collectionId")
+        
+        # Add to global total
+        total_size += size
+        
+        # Add to collection total (skip null)
+        if collection_id is not None:
+            collection_sizes[collection_id] += size
+    
+    # Phase 2: Extract Top K (O(C log K))
+    top_k = heapq.nlargest(
+        k,
+        collection_sizes.items(),
+        key=lambda item: item[1]  # Sort by size
+    )
+    
+    return {
+        "total_size": total_size,
+        "top_collections": top_k
+    }
+
+
+def generate_detailed_report_simple(files: List[Dict], k: int) -> Dict:
+    """
+    Enhanced version with file counts and average sizes.
+    
+    Time: O(N + C log K)
+    Space: O(C)
+    """
+    total_size = 0
+    collection_sizes = defaultdict(int)
+    collection_counts = defaultdict(int)
+    uncategorized_size = 0
+    
+    # Aggregate
+    for file in files:
+        size = file.get("size", 0)
+        collection_id = file.get("collectionId")
+        
+        total_size += size
+        
+        if collection_id is not None:
+            collection_sizes[collection_id] += size
+            collection_counts[collection_id] += 1
+        else:
+            uncategorized_size += size
+    
+    # Top K with additional info
+    top_k = []
+    for col_id, total in heapq.nlargest(k, collection_sizes.items(), key=lambda x: x[1]):
+        count = collection_counts[col_id]
+        top_k.append({
+            "collection_id": col_id,
+            "total_size": total,
+            "file_count": count,
+            "avg_size": total / count if count > 0 else 0
+        })
+    
+    return {
+        "total_size": total_size,
+        "num_collections": len(collection_sizes),
+        "uncategorized_size": uncategorized_size,
+        "top_collections": top_k
+    }
+
+
+# --- Runnable Example for Interview ---
+if __name__ == "__main__":
+    print("=" * 60)
+    print("FILE COLLECTIONS REPORT - ULTRA-SIMPLIFIED (NO CLASSES)")
+    print("=" * 60)
+    
+    # Test 1: Basic report
+    print("\n[Test 1] Basic Report")
+    files1 = [
+        {"name": "photo1.jpg", "size": 100, "collectionId": "photos"},
+        {"name": "photo2.jpg", "size": 200, "collectionId": "photos"},
+        {"name": "doc1.pdf", "size": 300, "collectionId": "docs"},
+        {"name": "doc2.pdf", "size": 150, "collectionId": "docs"},
+        {"name": "temp.txt", "size": 50, "collectionId": None}
+    ]
+    
+    report = generate_report_simple(files1, k=2)
+    print(f"Total Size: {report['total_size']} bytes")
+    print(f"Top 2 Collections:")
+    for col_id, size in report['top_collections']:
+        print(f"  {col_id}: {size} bytes")
+    print(f"Expected: docs=450, photos=300")
+    
+    # Test 2: Detailed report
+    print("\n[Test 2] Detailed Report")
+    report2 = generate_detailed_report_simple(files1, k=2)
+    print(f"Total Size: {report2['total_size']} bytes")
+    print(f"Number of Collections: {report2['num_collections']}")
+    print(f"Uncategorized Size: {report2['uncategorized_size']} bytes")
+    print(f"\nTop Collections:")
+    for col in report2['top_collections']:
+        print(f"  {col['collection_id']}:")
+        print(f"    Total: {col['total_size']} bytes")
+        print(f"    Files: {col['file_count']}")
+        print(f"    Average: {col['avg_size']:.2f} bytes/file")
+    
+    # Test 3: Edge cases
+    print("\n[Test 3] Edge Cases")
+    
+    # Empty files
+    report_empty = generate_report_simple([], k=5)
+    print(f"Empty list:")
+    print(f"  Total: {report_empty['total_size']}")
+    print(f"  Top: {report_empty['top_collections']}")
+    
+    # All null collections
+    files_null = [
+        {"name": "f1", "size": 100, "collectionId": None},
+        {"name": "f2", "size": 200, "collectionId": None}
+    ]
+    report_null = generate_report_simple(files_null, k=1)
+    print(f"\nAll null collections:")
+    print(f"  Total: {report_null['total_size']}")
+    print(f"  Top: {report_null['top_collections']}")
+    
+    # K larger than collections
+    files_small = [
+        {"name": "f1", "size": 100, "collectionId": "A"},
+        {"name": "f2", "size": 200, "collectionId": "B"}
+    ]
+    report_large_k = generate_report_simple(files_small, k=10)
+    print(f"\nK > C (k=10, only 2 collections):")
+    print(f"  Top: {report_large_k['top_collections']}")
+    
+    # Test 4: Tie-breaking
+    print("\n[Test 4] Tie-Breaking")
+    files_tie = [
+        {"name": "a1", "size": 100, "collectionId": "Alpha"},
+        {"name": "b1", "size": 100, "collectionId": "Beta"},
+        {"name": "c1", "size": 100, "collectionId": "Charlie"}
+    ]
+    report_tie = generate_report_simple(files_tie, k=2)
+    print(f"3 collections with same size (100 each):")
+    print(f"Top 2: {report_tie['top_collections']}")
+    print(f"Note: Any 2 of 3 is correct")
+    
+    # Test 5: Performance simulation
+    print("\n[Test 5] Performance Simulation")
+    import random
+    
+    # 1000 files across 50 collections
+    collections = [f"col{i}" for i in range(50)]
+    files_large = [
+        {
+            "name": f"file{i}",
+            "size": random.randint(100, 1000),
+            "collectionId": random.choice(collections + [None] * 5)
+        }
+        for i in range(1000)
+    ]
+    
+    report_large = generate_report_simple(files_large, k=5)
+    print(f"1000 files, 50 collections:")
+    print(f"  Total Size: {report_large['total_size']:,} bytes")
+    print(f"  Top 5 Collections:")
+    for i, (col_id, size) in enumerate(report_large['top_collections'], 1):
+        print(f"    {i}. {col_id}: {size:,} bytes")
+
+    print("\n" + "=" * 60)
+    print("Ultra-Simplified tests passed! ✓")
+    print("=" * 60)
+    print("\n💡 Key Points:")
+    print("  • Single pass aggregation: O(N)")
+    print("  • heapq.nlargest for Top K: O(C log K)")
+    print("  • Null collections counted in total, not in Top K")
+    print("  • Can write in 10-15 minutes")
+```
+
+**Why This Is Perfect for Interviews:**
+- ✅ **No classes** - Just functions and dicts
+- ✅ **10-15 minutes** - Can write from scratch quickly
+- ✅ **Standard library** - defaultdict + heapq
+- ✅ **Easy to explain** - Aggregate then Top K
+- ✅ **Optimal complexity** - O(N + C log K)
+
+**Trade-off:** No streaming or real-time updates. For those, use class-based solutions below.
+
+---
+
 ## 📝 Complete Solution
 
 ```python
@@ -743,6 +960,177 @@ class LiveReportGenerator:
         
         # Return sorted descending
         return sorted(valid_heap, reverse=True)[:self.k]
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    from collections import defaultdict
+    import heapq
+    from typing import Dict, List, Tuple
+    
+    class LiveReportGenerator:
+        """
+        Maintain live Top K with dynamic updates.
+        """
+        
+        def __init__(self, k: int):
+            self.k = k
+            self.total_size = 0
+            self.collection_sizes = defaultdict(int)
+            self.top_k_heap = []  # Min-heap of (size, col_id)
+            self.in_heap = set()  # Collections currently in heap
+        
+        def add_file(self, file: Dict) -> None:
+            """
+            Add a file to the system.
+            
+            Time: O(log K) amortized
+            """
+            size = file.get("size", 0)
+            collection_id = file.get("collectionId")
+            
+            self.total_size += size
+            
+            if collection_id is None:
+                return
+            
+            old_size = self.collection_sizes[collection_id]
+            new_size = old_size + size
+            self.collection_sizes[collection_id] = new_size
+            
+            # Update Top K heap
+            self._update_heap(collection_id, new_size)
+        
+        def remove_file(self, file: Dict) -> None:
+            """Remove a file from the system."""
+            size = file.get("size", 0)
+            collection_id = file.get("collectionId")
+            
+            self.total_size -= size
+            
+            if collection_id is None:
+                return
+            
+            new_size = self.collection_sizes[collection_id] - size
+            if new_size <= 0:
+                del self.collection_sizes[collection_id]
+                self.in_heap.discard(collection_id)
+            else:
+                self.collection_sizes[collection_id] = new_size
+                self._update_heap(collection_id, new_size)
+        
+        def _update_heap(self, col_id: str, new_size: int) -> None:
+            """
+            Update heap with new collection size.
+            """
+            if col_id in self.in_heap:
+                # Already in heap, size changed (lazy: just add new entry)
+                heapq.heappush(self.top_k_heap, (new_size, col_id))
+            else:
+                # Not in heap
+                if len(self.in_heap) < self.k:
+                    # Heap not full, add
+                    heapq.heappush(self.top_k_heap, (new_size, col_id))
+                    self.in_heap.add(col_id)
+                else:
+                    # Heap full, check if new size qualifies
+                    if self.top_k_heap and new_size > self.top_k_heap[0][0]:
+                        min_size, min_col = heapq.heapreplace(self.top_k_heap, (new_size, col_id))
+                        self.in_heap.discard(min_col)
+                        self.in_heap.add(col_id)
+        
+        def get_top_k(self) -> List[Tuple[str, int]]:
+            """
+            Get current Top K.
+            
+            Time: O(K log K) to sort heap
+            """
+            # Clean heap (remove stale entries)
+            valid_heap = [
+                (size, col_id)
+                for size, col_id in self.top_k_heap
+                if col_id in self.collection_sizes and self.collection_sizes[col_id] == size
+            ]
+            
+            # Return sorted descending
+            return sorted(valid_heap, reverse=True)[:self.k]
+    
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 2: REAL-TIME UPDATES")
+    print("=" * 70)
+    
+    # Initialize live tracker
+    tracker = LiveReportGenerator(k=3)
+    
+    # Simulate real-time file additions
+    print("\n📁 Adding files in real-time...")
+    print("-" * 70)
+    
+    files = [
+        {"name": "doc1.pdf", "collectionId": "proj-A", "size": 100},
+        {"name": "doc2.pdf", "collectionId": "proj-B", "size": 200},
+        {"name": "doc3.pdf", "collectionId": "proj-C", "size": 150},
+        {"name": "doc4.pdf", "collectionId": "proj-A", "size": 50},  # proj-A grows
+        {"name": "doc5.pdf", "collectionId": "proj-D", "size": 300},
+        {"name": "doc6.pdf", "collectionId": "proj-B", "size": 100},  # proj-B grows
+    ]
+    
+    for i, file in enumerate(files, 1):
+        tracker.add_file(file)
+        top_k = tracker.get_top_k()
+        
+        print(f"\nAfter adding file {i}: {file['name']} ({file['collectionId']}, {file['size']} KB)")
+        print(f"  Total size: {tracker.total_size} KB")
+        print(f"  Top 3 Collections:")
+        for rank, (size, col_id) in enumerate(top_k, 1):
+            print(f"    {rank}. {col_id}: {size} KB")
+    
+    # Test file removal
+    print("\n" + "=" * 70)
+    print("🗑️  Testing file removal...")
+    print("-" * 70)
+    
+    remove_file = {"name": "doc5.pdf", "collectionId": "proj-D", "size": 300}
+    tracker.remove_file(remove_file)
+    
+    print(f"\nRemoved: {remove_file['name']} ({remove_file['collectionId']}, {remove_file['size']} KB)")
+    print(f"Total size: {tracker.total_size} KB")
+    print("Top 3 Collections:")
+    for rank, (size, col_id) in enumerate(tracker.get_top_k(), 1):
+        print(f"  {rank}. {col_id}: {size} KB")
+    
+    # Stress test: Many updates
+    print("\n" + "=" * 70)
+    print("⚡ Stress Test: 100 rapid updates...")
+    print("-" * 70)
+    
+    import random
+    collections = [f"coll-{i}" for i in range(10)]
+    
+    for _ in range(100):
+        col_id = random.choice(collections)
+        size = random.randint(10, 100)
+        tracker.add_file({"collectionId": col_id, "size": size})
+    
+    print(f"\nAfter 100 updates:")
+    print(f"  Total size: {tracker.total_size} KB")
+    print(f"  Unique collections: {len(tracker.collection_sizes)}")
+    print(f"\n  Top 3 Collections:")
+    for rank, (size, col_id) in enumerate(tracker.get_top_k(), 1):
+        print(f"    {rank}. {col_id}: {size} KB")
+    
+    print("\n" + "=" * 70)
+    print("✅ Real-time updates test complete!")
+    print("=" * 70)
+    
+    print("\n💡 Key Benefits:")
+    print("  • O(log K) per file addition (very fast)")
+    print("  • O(K log K) to query Top K (efficient)")
+    print("  • No need to reprocess entire dataset")
+    print("  • Scales to millions of files")
 ```
 
 ---

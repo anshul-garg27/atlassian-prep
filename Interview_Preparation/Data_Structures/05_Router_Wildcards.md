@@ -202,6 +202,196 @@ If Step 3 failed:
 
 ---
 
+## 📝 Solution 0: Ultra-Simplified (Interview-Ready, No Classes)
+
+**Perfect for 15-20 minute interviews!** Simple dict-based approach without Trie complexity.
+
+```python
+from typing import Optional, Dict, List
+
+# Global routes dictionary for simplified version
+_routes_simple: Dict[str, str] = {}
+
+def add_route_simple(path: str, handler: str) -> None:
+    """
+    Register a route with a handler.
+    
+    Args:
+        path: URL path (e.g., "/api/users" or "/api/*/profile")
+        handler: Handler identifier
+    
+    Time: O(1)
+    Space: O(1)
+    """
+    # Normalize path: remove leading/trailing slashes
+    normalized = path.strip('/')
+    _routes_simple[normalized] = handler
+
+
+def match_route_simple(path: str) -> Optional[str]:
+    """
+    Find handler for a given path.
+    
+    Matching rules:
+    1. Try exact match first (highest priority)
+    2. Try wildcard matches (lower priority)
+    
+    Args:
+        path: URL path to match
+    
+    Returns:
+        Handler string if match found, None otherwise
+    
+    Time: O(R) where R = number of registered routes (worst case)
+    Space: O(1)
+    """
+    # Normalize path
+    normalized = path.strip('/')
+    segments = [s for s in normalized.split('/') if s]
+    
+    # Try exact match first
+    if normalized in _routes_simple:
+        return _routes_simple[normalized]
+    
+    # Try wildcard matches
+    for route_pattern, handler in _routes_simple.items():
+        pattern_segments = [s for s in route_pattern.split('/') if s]
+        
+        # Check if pattern matches
+        if _matches_pattern(segments, pattern_segments):
+            return handler
+    
+    return None
+
+
+def _matches_pattern(path_segments: List[str], pattern_segments: List[str]) -> bool:
+    """
+    Check if path matches pattern (with * wildcards).
+    
+    Args:
+        path_segments: Actual path split into segments
+        pattern_segments: Pattern split into segments (may contain *)
+    
+    Returns:
+        True if pattern matches path
+    """
+    # Must have same number of segments
+    if len(path_segments) != len(pattern_segments):
+        return False
+    
+    # Check each segment
+    for path_seg, pattern_seg in zip(path_segments, pattern_segments):
+        if pattern_seg != '*' and pattern_seg != path_seg:
+            return False
+    
+    return True
+
+
+def reset_routes_simple() -> None:
+    """Reset the global routes (useful for testing)."""
+    _routes_simple.clear()
+
+
+# --- Runnable Example for Interview ---
+if __name__ == "__main__":
+    print("=" * 60)
+    print("HTTP ROUTER - ULTRA-SIMPLIFIED (NO CLASSES)")
+    print("=" * 60)
+    
+    # Reset for clean test
+    reset_routes_simple()
+    
+    # Test 1: Basic routes
+    print("\n[Test 1] Basic Routes")
+    add_route_simple("/api/users", "GetUsers")
+    add_route_simple("/api/posts", "GetPosts")
+    add_route_simple("/api/users/profile", "GetProfile")
+    
+    print(f"Match '/api/users': {match_route_simple('/api/users')}")
+    print(f"Match '/api/posts': {match_route_simple('/api/posts')}")
+    print(f"Match '/api/unknown': {match_route_simple('/api/unknown')}")
+    print(f"Expected: GetUsers, GetPosts, None")
+    
+    # Test 2: Wildcard routes
+    print("\n[Test 2] Wildcard Routes")
+    reset_routes_simple()
+    add_route_simple("/users/*/posts", "UserPosts")
+    add_route_simple("/users/*/posts/*", "GetPost")
+    
+    print(f"Match '/users/john/posts': {match_route_simple('/users/john/posts')}")
+    print(f"Match '/users/jane/posts': {match_route_simple('/users/jane/posts')}")
+    print(f"Match '/users/john/posts/5': {match_route_simple('/users/john/posts/5')}")
+    print(f"Match '/users/john': {match_route_simple('/users/john')}")
+    print(f"Expected: UserPosts, UserPosts, GetPost, None")
+    
+    # Test 3: Priority (Exact > Wildcard)
+    print("\n[Test 3] Priority Rules")
+    reset_routes_simple()
+    add_route_simple("/products/featured", "FeaturedProducts")
+    add_route_simple("/products/*", "ProductById")
+    
+    print(f"Match '/products/featured': {match_route_simple('/products/featured')}")
+    print(f"Match '/products/123': {match_route_simple('/products/123')}")
+    print(f"Expected: FeaturedProducts (exact), ProductById (wildcard)")
+    
+    # Test 4: Trailing slashes
+    print("\n[Test 4] Trailing Slashes")
+    reset_routes_simple()
+    add_route_simple("/api/data", "GetData")
+    
+    print(f"Match '/api/data': {match_route_simple('/api/data')}")
+    print(f"Match '/api/data/': {match_route_simple('/api/data/')}")
+    print(f"Expected: Both match GetData (normalized)")
+    
+    # Test 5: Complex wildcards
+    print("\n[Test 5] Complex Wildcards")
+    reset_routes_simple()
+    add_route_simple("/a/*/c/*/e", "ComplexRoute")
+    
+    print(f"Match '/a/b/c/d/e': {match_route_simple('/a/b/c/d/e')}")
+    print(f"Match '/a/x/c/y/e': {match_route_simple('/a/x/c/y/e')}")
+    print(f"Match '/a/b/c/e': {match_route_simple('/a/b/c/e')}")
+    print(f"Expected: ComplexRoute, ComplexRoute, None (wrong segment count)")
+    
+    # Test 6: Edge cases
+    print("\n[Test 6] Edge Cases")
+    reset_routes_simple()
+    add_route_simple("/", "HomePage")
+    add_route_simple("/about", "AboutPage")
+    
+    print(f"Match '/': {match_route_simple('/')}")
+    print(f"Match '/about': {match_route_simple('/about')}")
+    print(f"Expected: HomePage, AboutPage")
+
+    print("\n" + "=" * 60)
+    print("Ultra-Simplified tests passed! ✓")
+    print("=" * 60)
+    print("\n💡 Key Points:")
+    print("  • Dict-based: O(R) matching (simple but works)")
+    print("  • Exact match checked first (priority)")
+    print("  • Wildcard (*) matches exactly one segment")
+    print("  • Can write in 15-20 minutes")
+    print("\n⚠️  Trade-off:")
+    print("  • O(R) matching vs O(K) with Trie")
+    print("  • Good for < 100 routes (most interviews)")
+    print("  • For production with 1000s routes, use Trie below")
+```
+
+**Why This Is Perfect for Interviews:**
+- ✅ **No Trie complexity** - Just dicts and loops
+- ✅ **15-20 minutes** - Can write from scratch quickly
+- ✅ **Easy to explain** - Linear search with pattern matching
+- ✅ **Handles core cases** - Exact, wildcard, priority
+- ✅ **Standard library only** - No custom data structures
+
+**When to Use Trie (Production Solution Below):**
+- 100+ routes (O(K) vs O(R) matters)
+- Named parameters needed (`/users/{id}`)
+- Complex nested wildcards
+- HTTP method routing
+
+---
+
 ## 📝 Complete Solution
 
 ```python
@@ -839,6 +1029,191 @@ class MiddlewareRouter:
                 return result
         
         return None
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    from typing import Optional, List, Dict
+    from collections import defaultdict
+    
+    class TrieNode:
+        def __init__(self):
+            self.children = {}
+            self.handler = None
+            self.middlewares = []
+    
+    class MiddlewareRouter:
+        """
+        HTTP Router with middleware support.
+        
+        Middlewares are inherited along the path from root to leaf.
+        """
+        
+        def __init__(self):
+            self.root = TrieNode()
+        
+        def _split_path(self, path: str) -> List[str]:
+            """Split path into segments."""
+            return [seg for seg in path.split('/') if seg]
+        
+        def addRoute(self, path: str, handler: str) -> None:
+            """Add a route with handler."""
+            segments = self._split_path(path)
+            node = self.root
+            
+            for segment in segments:
+                if segment not in node.children:
+                    node.children[segment] = TrieNode()
+                node = node.children[segment]
+            
+            node.handler = handler
+        
+        def addMiddleware(self, path: str, middleware: str) -> None:
+            """
+            Attach middleware to a path prefix.
+            
+            All routes under this path will inherit this middleware.
+            
+            Time: O(M) where M = segments in path
+            Space: O(M)
+            """
+            segments = self._split_path(path)
+            node = self.root
+            
+            for segment in segments:
+                if segment not in node.children:
+                    node.children[segment] = TrieNode()
+                node = node.children[segment]
+            
+            node.middlewares.append(middleware)
+        
+        def matchRoute(self, path: str) -> Optional[Dict]:
+            """
+            Return handler and accumulated middleware.
+            
+            Returns:
+                {"handler": str, "middlewares": List[str]} or None
+            
+            Time: O(M) where M = segments in path
+            Space: O(M)
+            """
+            segments = self._split_path(path)
+            return self._dfs(self.root, segments, 0, [])
+        
+        def _dfs(self, node, segments, index, middlewares):
+            """DFS with middleware accumulation."""
+            # Accumulate middleware at this node
+            accumulated = middlewares + node.middlewares
+            
+            if index == len(segments):
+                if node.handler:
+                    return {"handler": node.handler, "middlewares": accumulated}
+                return None
+            
+            segment = segments[index]
+            
+            # Try exact match first (higher priority)
+            if segment in node.children:
+                result = self._dfs(node.children[segment], segments, index + 1, accumulated)
+                if result:
+                    return result
+            
+            # Try wildcard match second
+            if '*' in node.children:
+                result = self._dfs(node.children['*'], segments, index + 1, accumulated)
+                if result:
+                    return result
+            
+            return None
+    
+    print("\n" + "=" * 70)
+    print("FOLLOW-UP 3: MIDDLEWARE CHAIN")
+    print("=" * 70)
+    
+    router = MiddlewareRouter()
+    
+    # Setup: Add middleware at different levels
+    print("\n📝 Setting up routes and middleware...")
+    
+    # Global middleware (affects all routes)
+    router.addMiddleware("/", "Logger")
+    
+    # API-specific middleware
+    router.addMiddleware("/api", "Auth")
+    router.addMiddleware("/api/admin", "AdminCheck")
+    
+    # Add routes
+    router.addRoute("/", "HomePage")
+    router.addRoute("/about", "AboutPage")
+    router.addRoute("/api/users", "GetUsers")
+    router.addRoute("/api/posts", "GetPosts")
+    router.addRoute("/api/admin/settings", "AdminSettings")
+    router.addRoute("/api/admin/*/delete", "AdminDelete")
+    
+    # Test cases
+    test_cases = [
+        ("/", ["Logger"], "HomePage"),
+        ("/about", ["Logger"], "AboutPage"),
+        ("/api/users", ["Logger", "Auth"], "GetUsers"),
+        ("/api/posts", ["Logger", "Auth"], "GetPosts"),
+        ("/api/admin/settings", ["Logger", "Auth", "AdminCheck"], "AdminSettings"),
+        ("/api/admin/users/delete", ["Logger", "Auth", "AdminCheck"], "AdminDelete"),
+        ("/api/admin/posts/delete", ["Logger", "Auth", "AdminCheck"], "AdminDelete"),
+    ]
+    
+    print("\n🧪 Testing middleware chain...")
+    print("-" * 70)
+    
+    for path, expected_middleware, expected_handler in test_cases:
+        result = router.matchRoute(path)
+        
+        if result:
+            handler = result["handler"]
+            middlewares = result["middlewares"]
+            status = "✓" if (middlewares == expected_middleware and handler == expected_handler) else "✗"
+            
+            print(f"\n{status} Path: {path}")
+            print(f"  Handler: {handler}")
+            print(f"  Middleware chain: {' → '.join(middlewares) if middlewares else 'None'}")
+            
+            if status == "✗":
+                print(f"  Expected: {' → '.join(expected_middleware)}")
+        else:
+            print(f"\n✗ Path: {path}")
+            print(f"  No match found")
+    
+    # Demonstrate execution order
+    print("\n" + "=" * 70)
+    print("📊 Middleware Execution Flow Visualization")
+    print("=" * 70)
+    
+    test_path = "/api/admin/users/delete"
+    result = router.matchRoute(test_path)
+    
+    if result:
+        print(f"\nPath: {test_path}")
+        print(f"\nExecution Order:")
+        print("┌" + "─" * 50 + "┐")
+        
+        for i, middleware in enumerate(result["middlewares"], 1):
+            print(f"│ {i}. {middleware:<46} │")
+        
+        print("├" + "─" * 50 + "┤")
+        print(f"│ → Handler: {result['handler']:<37} │")
+        print("└" + "─" * 50 + "┘")
+        
+        print("\nExplanation:")
+        print("  • Logger: Applied at root level (all routes)")
+        print("  • Auth: Applied to all /api routes")
+        print("  • AdminCheck: Applied to all /api/admin routes")
+        print("  • Handler: Final handler executes after all middleware")
+    
+    print("\n" + "=" * 70)
+    print("✅ Middleware chain test complete!")
+    print("=" * 70)
 ```
 
 ---

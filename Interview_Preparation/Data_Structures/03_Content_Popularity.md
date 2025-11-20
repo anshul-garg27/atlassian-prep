@@ -429,7 +429,112 @@ We need to support **arbitrary access** (updates) and **ordered max access** (qu
 
 ---
 
-## 📝 Complete Solution
+## 📝 Solution 0: Ultra-Simplified (No Classes - Interview Speed Coding)
+
+**Perfect for 20-30 minute interviews.** Trades some performance for simplicity.
+
+```python
+from collections import defaultdict
+
+# Global state (or pass as parameters)
+popularity = defaultdict(int)  # contentId -> popularity count
+
+def increase_popularity(content_id):
+    """Increase popularity of content by 1."""
+    popularity[content_id] += 1
+
+def decrease_popularity(content_id):
+    """Decrease popularity of content by 1."""
+    if content_id in popularity:
+        popularity[content_id] -= 1
+        if popularity[content_id] <= 0:
+            del popularity[content_id]
+
+def most_popular():
+    """Return most popular content (highest count)."""
+    if not popularity:
+        return None
+    
+    # Find max count
+    max_count = max(popularity.values())
+    
+    # Find all items with max count (for tie-breaking)
+    candidates = [cid for cid, count in popularity.items() if count == max_count]
+    
+    # Return any one (or implement tie-breaking logic)
+    return candidates[0] if candidates else None
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("CONTENT POPULARITY TRACKER - ULTRA SIMPLIFIED")
+    print("=" * 60)
+    
+    # Test 1: Basic operations
+    print("\n[Test 1] Basic Operations")
+    print("-" * 40)
+    increase_popularity("video1")
+    increase_popularity("video2")
+    increase_popularity("video1")
+    
+    print(f"Popularity counts: {dict(popularity)}")
+    print(f"Most popular: {most_popular()}")
+    
+    # Test 2: More increases
+    print("\n[Test 2] Multiple Increases")
+    print("-" * 40)
+    increase_popularity("video3")
+    increase_popularity("video3")
+    increase_popularity("video3")
+    
+    print(f"Popularity counts: {dict(popularity)}")
+    print(f"Most popular: {most_popular()}")
+    
+    # Test 3: Decrease
+    print("\n[Test 3] Decrease Popularity")
+    print("-" * 40)
+    decrease_popularity("video3")
+    decrease_popularity("video3")
+    
+    print(f"Popularity counts: {dict(popularity)}")
+    print(f"Most popular: {most_popular()}")
+    
+    # Test 4: Edge cases
+    print("\n[Test 4] Edge Cases")
+    print("-" * 40)
+    decrease_popularity("video1")
+    decrease_popularity("video1")  # Goes to 0, should be removed
+    
+    print(f"Popularity counts: {dict(popularity)}")
+    print(f"Most popular: {most_popular()}")
+    
+    print("\n" + "=" * 60)
+    print("✅ All operations completed!")
+    print("=" * 60)
+    
+    print("\n💡 Trade-offs:")
+    print("  ✅ Increase/Decrease: O(1)")
+    print("  ⚠️  Most Popular: O(N) - scans all items")
+    print("  ✅ Simple to code in interview")
+    print("\n  For O(1) most_popular(), use DLL + HashMap (see below)")
+```
+
+**Complexity:**
+- `increase_popularity()`: **O(1)**
+- `decrease_popularity()`: **O(1)**  
+- `most_popular()`: **O(N)** where N = unique content items
+
+**When to use:** Interview time-pressure, or when `most_popular()` is called rarely.
+
+---
+
+## 📝 Solution 1: Optimal (DLL + HashMap for O(1) Everything)
+
+If interviewer asks for O(1) `most_popular()`, use this:
 
 ```python
 from typing import Optional, Set, Dict

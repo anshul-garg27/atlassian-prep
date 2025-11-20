@@ -163,7 +163,114 @@ Query maximum():
 
 ---
 
-## 📝 Solution 1: Simplified Interview Version (Recommended)
+## 📝 Solution 0: Ultra-Simplified (No Classes - Interview Speed Coding)
+
+**Perfect for 20-30 minute interviews.** Uses only dictionaries and heaps - no classes needed.
+
+```python
+import heapq
+
+# Global state (in real interview, could be local to functions or passed as params)
+prices = {}  # timestamp -> price
+latest_time = 0
+min_heap = []  # (price, timestamp)
+max_heap = []  # (-price, timestamp)
+
+def update(timestamp, price):
+    """Update price at given timestamp."""
+    global prices, latest_time, min_heap, max_heap
+    
+    prices[timestamp] = price
+    latest_time = max(latest_time, timestamp)
+    
+    # Lazy deletion: just push new values
+    heapq.heappush(min_heap, (price, timestamp))
+    heapq.heappush(max_heap, (-price, timestamp))
+
+def current():
+    """Return current (latest) price."""
+    return prices[latest_time]
+
+def maximum():
+    """Return maximum price (lazy deletion of stale entries)."""
+    while max_heap:
+        price, ts = max_heap[0]
+        if prices.get(ts) == -price:  # Valid entry
+            return -price
+        heapq.heappop(max_heap)  # Stale, remove
+    return None
+
+def minimum():
+    """Return minimum price (lazy deletion of stale entries)."""
+    while min_heap:
+        price, ts = min_heap[0]
+        if prices.get(ts) == price:  # Valid entry
+            return price
+        heapq.heappop(min_heap)  # Stale, remove
+    return None
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("STOCK PRICE TRACKER - ULTRA SIMPLIFIED")
+    print("=" * 60)
+    
+    # Test 1: Basic operations
+    print("\n[Test 1] Basic Operations")
+    print("-" * 40)
+    update(1, 10)
+    update(2, 5)
+    print(f"After updates: t=1 → $10, t=2 → $5")
+    print(f"  Current: ${current()}")
+    print(f"  Maximum: ${maximum()}")
+    print(f"  Minimum: ${minimum()}")
+    
+    # Test 2: Price correction
+    print("\n[Test 2] Price Correction")
+    print("-" * 40)
+    print(f"Before correction: Max = ${maximum()}")
+    update(1, 3)  # Correct t=1 from 10 → 3
+    print(f"After correcting t=1 to $3:")
+    print(f"  Maximum: ${maximum()}")
+    print(f"  Minimum: ${minimum()}")
+    
+    # Test 3: Multiple updates
+    print("\n[Test 3] Multiple Updates")
+    print("-" * 40)
+    update(3, 15)
+    update(4, 8)
+    update(5, 12)
+    print(f"Added: t=3→$15, t=4→$8, t=5→$12")
+    print(f"  Current: ${current()}")
+    print(f"  Maximum: ${maximum()}")
+    print(f"  Minimum: ${minimum()}")
+    
+    print("\n" + "=" * 60)
+    print("✅ All operations completed!")
+    print("=" * 60)
+    
+    print("\n💡 Key Points:")
+    print("  • No classes - just functions and dicts")
+    print("  • Lazy deletion - don't remove from heap immediately")
+    print("  • Ground truth in prices dict")
+    print("  • O(1) update, O(log N) max/min (amortized)")
+```
+
+**Why This Works in Interviews:**
+- ✅ **Quick to write** - ~30 lines of core logic
+- ✅ **No boilerplate** - no `__init__`, `self`, etc.
+- ✅ **Clear intent** - function names speak for themselves
+- ✅ **Easy to test** - just call functions directly
+
+---
+
+## 📝 Solution 1: Class-Based Version (Production Ready)
+
+If you have time or interviewer prefers OOP style:
 
 This version is concise and focuses on the core logic: using heaps for min/max and a dictionary for the "ground truth". It includes a runnable example block.
 
