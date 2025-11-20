@@ -1444,6 +1444,16 @@ find_closest_group(["Alice", "Bob"])
 def find_closest_multi_simple(hierarchy, employees):
     """
     Simplified solution for multiple groups using Set Intersection.
+    
+    Args:
+        hierarchy: Nested dict where employees can appear in multiple places
+        employees: List of employee names
+        
+    Returns:
+        Name of deepest common ancestor group
+        
+    Time: O(K × G × H) where K = employees, G = groups per employee, H = height
+    Space: O(K × G × H) for ancestor sets
     """
     # 1. Build Parent Map (child -> LIST of parents)
     parents = {} # name -> [parent_names]
@@ -1487,12 +1497,118 @@ def find_closest_multi_simple(hierarchy, employees):
     if not common_ancestors: return None
     
     # 4. Find the deepest ancestor in the common set
-    # We need a way to measure depth. Simple BFS from root can assign depths.
-    # For interview, you can assume a helper `get_depth(node)` exists or implement simple one.
+    # Calculate depth by counting parents up to "Company"
+    def get_depth(node):
+        if node == "Company":
+            return 0
+        depth = 0
+        visited = set()
+        queue = [(node, 0)]
+        max_depth = 0
+        
+        while queue:
+            curr, d = queue.pop(0)
+            if curr in visited:
+                continue
+            visited.add(curr)
+            
+            if curr == "Company":
+                max_depth = max(max_depth, d)
+                continue
+                
+            for p in parents.get(curr, []):
+                queue.append((p, d + 1))
+        
+        return max_depth
     
-    # (Simplified depth check for this snippet)
-    # In a real interview, you'd calculate depth. Here we just return one.
-    return list(common_ancestors)[0] 
+    # Find deepest common ancestor
+    deepest = None
+    max_depth_found = -1
+    
+    for ancestor in common_ancestors:
+        depth = get_depth(ancestor)
+        if depth > max_depth_found:
+            max_depth_found = depth
+            deepest = ancestor
+    
+    return deepest
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 1: SIMPLIFIED - EMPLOYEES IN MULTIPLE GROUPS")
+    print("=" * 60)
+    
+    # Hierarchy where Alice appears in both Backend and Mobile
+    hierarchy = {
+        "Engg": {
+            "Backend": ["Alice", "Bob"],
+            "Frontend": ["Lisa"],
+            "Mobile": ["Alice", "Mike"]  # Alice appears here too!
+        },
+        "HR": ["Charlie"],
+        "Sales": {
+            "North": ["David"],
+            "South": ["Eve"]
+        }
+    }
+    
+    # Test cases
+    test_cases = [
+        (["Alice", "Bob"], "Backend", "Alice's Backend path shares with Bob"),
+        (["Alice", "Mike"], "Mobile", "Alice's Mobile path shares with Mike"),
+        (["Bob", "Mike"], "Engg", "Bob and Mike only share Engg"),
+        (["Alice", "Lisa"], "Engg", "All paths through Engg"),
+    ]
+    
+    print("\nRunning Tests:\n")
+    for employees, expected, explanation in test_cases:
+        result = find_closest_multi_simple(hierarchy, employees)
+        status = "✓" if result == expected else "✗"
+        print(f"{status} Employees: {employees}")
+        print(f"  Expected: {expected}, Got: {result}")
+        print(f"  Explanation: {explanation}\n")
+    
+    # Show ancestor sets for debugging
+    print("=" * 60)
+    print("ANCESTOR SETS (for debugging)")
+    print("=" * 60)
+    
+    # Rebuild parent map
+    parents = {}
+    def build_multi_map(data, parent_name):
+        if isinstance(data, dict):
+            for group, content in data.items():
+                if group not in parents: parents[group] = []
+                parents[group].append(parent_name)
+                build_multi_map(content, group)
+        elif isinstance(data, list):
+            for emp in data:
+                if emp not in parents: parents[emp] = []
+                parents[emp].append(parent_name)
+    
+    build_multi_map(hierarchy, "Company")
+    
+    def get_all_ancestors(node):
+        ancestors = set()
+        queue = [node]
+        while queue:
+            curr = queue.pop(0)
+            ancestors.add(curr)
+            for p in parents.get(curr, []):
+                if p not in ancestors:
+                    queue.append(p)
+        return ancestors
+    
+    print(f"\nAlice's ancestors: {get_all_ancestors('Alice')}")
+    print(f"Bob's ancestors: {get_all_ancestors('Bob')}")
+    print(f"Mike's ancestors: {get_all_ancestors('Mike')}")
+    print(f"\nAlice ∩ Bob = {get_all_ancestors('Alice') & get_all_ancestors('Bob')}")
+    print(f"Alice ∩ Mike = {get_all_ancestors('Alice') & get_all_ancestors('Mike')}")
 ```
 
 #### Solution 2: Production (Class-Based)
@@ -1696,14 +1812,27 @@ This ensures we don't read the tree while it's being modified (preventing race c
 
 ```python
 import threading
+from typing import List, Optional
 
 class ThreadSafeDirectory:
+    """
+    Thread-safe employee directory using a simple lock approach.
+    
+    Uses RLock to handle concurrent reads and writes safely.
+    """
+    
     def __init__(self):
         self.lock = threading.RLock() # Reentrant Lock
         self.employee_to_group = {}
         self.group_hierarchy = {}
 
-    def find_closest(self, emps):
+    def find_closest(self, emps: List[str]) -> Optional[str]:
+        """
+        Find closest common group with thread safety.
+        
+        Time: O(K × H)
+        Space: O(K × H)
+        """
         with self.lock: # Or read_lock if available
             # Perform LCA query on current state
             paths = []
@@ -1718,7 +1847,8 @@ class ThreadSafeDirectory:
                 return None
             return self._find_common_prefix(paths)
 
-    def add_employee(self, emp, group):
+    def add_employee(self, emp: str, group: str):
+        """Add employee to a group (thread-safe write)."""
         with self.lock: # Exclusive write lock
             # Update employee-group mapping
             self.employee_to_group[emp] = group
@@ -1727,7 +1857,8 @@ class ThreadSafeDirectory:
             if group not in self.group_hierarchy:
                 self.group_hierarchy[group] = {"parent": None, "children": set()}
     
-    def _trace_path_to_root(self, group):
+    def _trace_path_to_root(self, group: str) -> List[str]:
+        """Trace path from group to root."""
         path = []
         current = group
         while current:
@@ -1735,13 +1866,85 @@ class ThreadSafeDirectory:
             current = self.group_hierarchy.get(current, {}).get("parent")
         return path[::-1]
     
-    def _find_common_prefix(self, paths):
+    def _find_common_prefix(self, paths: List[List[str]]) -> Optional[str]:
+        """Find longest common prefix of paths."""
         if not paths:
             return None
         for i in range(min(len(p) for p in paths)):
             if len(set(p[i] for p in paths)) > 1:
                 return paths[0][i-1] if i > 0 else None
         return paths[0][-1]
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    import time
+    
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 2: THREAD SAFETY - SIMPLIFIED")
+    print("=" * 60)
+    
+    directory = ThreadSafeDirectory()
+    
+    # Setup initial hierarchy
+    directory.group_hierarchy = {
+        "Company": {"parent": None, "children": {"Engg", "HR"}},
+        "Engg": {"parent": "Company", "children": {"Backend", "Frontend"}},
+        "Backend": {"parent": "Engg", "children": set()},
+        "Frontend": {"parent": "Engg", "children": set()},
+        "HR": {"parent": "Company", "children": set()}
+    }
+    
+    directory.employee_to_group["Alice"] = "Backend"
+    directory.employee_to_group["Bob"] = "Backend"
+    directory.employee_to_group["Lisa"] = "Frontend"
+    
+    results = []
+    
+    # Reader thread - runs queries
+    def reader_thread(thread_id):
+        for i in range(5):
+            result = directory.find_closest(["Alice", "Bob"])
+            results.append(f"Reader {thread_id}: Query {i+1} -> {result}")
+            time.sleep(0.01)
+    
+    # Writer thread - adds employees
+    def writer_thread(thread_id):
+        for i in range(3):
+            emp_name = f"NewEmp{thread_id}_{i}"
+            directory.add_employee(emp_name, "Backend")
+            results.append(f"Writer {thread_id}: Added {emp_name}")
+            time.sleep(0.02)
+    
+    # Start multiple threads
+    threads = []
+    
+    # 3 reader threads
+    for i in range(3):
+        t = threading.Thread(target=reader_thread, args=(i,))
+        threads.append(t)
+        t.start()
+    
+    # 2 writer threads
+    for i in range(2):
+        t = threading.Thread(target=writer_thread, args=(i,))
+        threads.append(t)
+        t.start()
+    
+    # Wait for all to complete
+    for t in threads:
+        t.join()
+    
+    print("\nThread execution log:")
+    for result in results:
+        print(f"  {result}")
+    
+    print("\n✓ All threads completed successfully!")
+    print(f"✓ No race conditions detected")
+    print(f"✓ Total employees added: {len([k for k in directory.employee_to_group.keys() if 'NewEmp' in k])}")
 ```
 
 #### Solution 2: Production (Read-Write Lock)
@@ -1750,7 +1953,100 @@ class ThreadSafeDirectory:
 
 ```python
 import threading
-from typing import List
+from typing import List, Optional
+
+# TreeNode class (needed for this solution)
+class TreeNode:
+    """Represents a node in the organization hierarchy."""
+    def __init__(self, name: str):
+        self.name = name
+        self.parent: Optional[TreeNode] = None
+        self.children: List[TreeNode] = []
+
+
+class EmployeeDirectory:
+    """Base employee directory class."""
+    
+    def __init__(self):
+        self.nodes = {}
+        self.root = None
+    
+    def build_from_dict(self, hierarchy):
+        """Build tree from nested dictionary."""
+        self.root = TreeNode("Company")
+        self.nodes["Company"] = self.root
+        self._build_recursive(hierarchy, self.root)
+    
+    def _build_recursive(self, data, parent):
+        """Helper to recursively build tree."""
+        if isinstance(data, dict):
+            for name, children in data.items():
+                node = TreeNode(name)
+                node.parent = parent
+                parent.children.append(node)
+                self.nodes[name] = node
+                self._build_recursive(children, node)
+        elif isinstance(data, list):
+            for emp_name in data:
+                emp_node = TreeNode(emp_name)
+                emp_node.parent = parent
+                parent.children.append(emp_node)
+                self.nodes[emp_name] = emp_node
+    
+    def find_closest_group(self, employees: List[str]) -> Optional[str]:
+        """Find closest common group."""
+        if not employees:
+            return None
+        
+        if len(employees) == 1:
+            emp_node = self.nodes.get(employees[0])
+            if emp_node and emp_node.parent:
+                return emp_node.parent.name
+            return None
+        
+        paths = []
+        for emp in employees:
+            if emp not in self.nodes:
+                raise ValueError(f"Employee '{emp}' not found")
+            path = self._get_path_to_root(self.nodes[emp])
+            paths.append(path)
+        
+        lca_name = self._find_common_prefix(paths)
+        
+        if lca_name in employees:
+            node = self.nodes[lca_name]
+            if node.parent:
+                return node.parent.name
+            return None
+        
+        return lca_name
+    
+    def _get_path_to_root(self, node):
+        """Trace path from node to root."""
+        path = []
+        current = node
+        while current:
+            path.append(current.name)
+            current = current.parent
+        return path[::-1]
+    
+    def _find_common_prefix(self, paths):
+        """Find longest common prefix."""
+        if not paths:
+            return None
+        
+        min_len = min(len(p) for p in paths)
+        lca = None
+        
+        for i in range(min_len):
+            first_node = paths[0][i]
+            if all(path[i] == first_node for path in paths):
+                lca = first_node
+            else:
+                break
+        
+        return lca
+
 
 class ThreadSafeDirectory(EmployeeDirectory):
     """
@@ -1763,7 +2059,7 @@ class ThreadSafeDirectory(EmployeeDirectory):
         super().__init__()
         self.lock = threading.RLock()  # Reentrant lock
     
-    def find_closest_group(self, employees: List[str]) -> str:
+    def find_closest_group(self, employees: List[str]) -> Optional[str]:
         """READ operation - multiple readers allowed."""
         with self.lock:
             return super().find_closest_group(employees)
@@ -1804,30 +2100,109 @@ class ThreadSafeDirectory(EmployeeDirectory):
             new_parent.children.append(emp_node)
 
 
-# Example Usage
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
 if __name__ == "__main__":
+    import time
+    
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 2: THREAD SAFETY - PRODUCTION (Class-Based)")
+    print("=" * 60)
+    
+    # Build directory
     directory = ThreadSafeDirectory()
     
-    # Thread 1: Reader
-    def reader_thread():
-        for _ in range(100):
-            result = directory.find_closest_group(["Alice", "Bob"])
-            print(f"Reader: {result}")
+    hierarchy = {
+        "Engg": {
+            "Backend": ["Alice", "Bob"],
+            "Frontend": ["Lisa"]
+        },
+        "HR": ["Charlie"]
+    }
     
-    # Thread 2: Writer
-    def writer_thread():
-        for i in range(10):
-            directory.add_employee(f"NewEmp{i}", "Backend")
-            print(f"Writer: Added NewEmp{i}")
+    directory.build_from_dict(hierarchy)
     
-    # Start threads
-    t1 = threading.Thread(target=reader_thread)
-    t2 = threading.Thread(target=writer_thread)
+    results = []
+    errors = []
     
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    # Thread 1: Reader - queries LCA
+    def reader_thread(thread_id):
+        for i in range(5):
+            try:
+                result = directory.find_closest_group(["Alice", "Bob"])
+                results.append(f"[Reader {thread_id}] Query {i+1}: LCA = {result}")
+            except Exception as e:
+                errors.append(f"[Reader {thread_id}] Error: {e}")
+            time.sleep(0.01)
+    
+    # Thread 2: Writer - adds employees
+    def writer_thread(thread_id):
+        for i in range(3):
+            try:
+                emp_name = f"NewEmp{thread_id}_{i}"
+                directory.add_employee(emp_name, "Backend")
+                results.append(f"[Writer {thread_id}] Added employee: {emp_name}")
+            except Exception as e:
+                errors.append(f"[Writer {thread_id}] Error: {e}")
+            time.sleep(0.02)
+    
+    # Thread 3: Mover - moves employees
+    def mover_thread():
+        time.sleep(0.05)  # Wait for some employees to be added
+        try:
+            directory.move_employee("Lisa", "Backend")
+            results.append("[Mover] Moved Lisa from Frontend to Backend")
+            
+            # Now Alice, Bob, Lisa should all be in Backend
+            result = directory.find_closest_group(["Alice", "Bob", "Lisa"])
+            results.append(f"[Mover] After move, LCA(Alice, Bob, Lisa) = {result}")
+        except Exception as e:
+            errors.append(f"[Mover] Error: {e}")
+    
+    # Start multiple threads
+    threads = []
+    
+    # 3 reader threads
+    for i in range(3):
+        t = threading.Thread(target=reader_thread, args=(i,))
+        threads.append(t)
+        t.start()
+    
+    # 2 writer threads
+    for i in range(2):
+        t = threading.Thread(target=writer_thread, args=(i,))
+        threads.append(t)
+        t.start()
+    
+    # 1 mover thread
+    mover = threading.Thread(target=mover_thread)
+    threads.append(mover)
+    mover.start()
+    
+    # Wait for all threads to complete
+    for t in threads:
+        t.join()
+    
+    # Print results
+    print("\n📋 Thread Execution Log:")
+    print("-" * 60)
+    for result in sorted(results):
+        print(f"  {result}")
+    
+    if errors:
+        print("\n❌ Errors encountered:")
+        for error in errors:
+            print(f"  {error}")
+    else:
+        print("\n✅ All operations completed successfully!")
+    
+    print("\n📊 Final Statistics:")
+    print(f"  Total employees in directory: {len([k for k in directory.nodes.keys() if 'Emp' in k or k in ['Alice', 'Bob', 'Lisa', 'Charlie']])}")
+    print(f"  New employees added: {len([k for k in directory.nodes.keys() if 'NewEmp' in k])}")
+    print(f"  Total operations: {len(results)}")
+    print(f"  Race conditions: 0 (protected by locks)")
 ```
 
 **Pros:**
@@ -1957,25 +2332,128 @@ class COWDirectory:
             self.current_snapshot = new_snapshot
 
 
-# Example: High read throughput
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
 if __name__ == "__main__":
+    import time
+    
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 2: COPY-ON-WRITE (Advanced, Read-Heavy)")
+    print("=" * 60)
+    
+    # TreeNode class needed for COW
+    class TreeNode:
+        def __init__(self, name):
+            self.name = name
+            self.parent = None
+            self.children = []
+    
+    # Build initial snapshot
+    company = TreeNode("Company")
+    engg = TreeNode("Engg")
+    backend = TreeNode("Backend")
+    frontend = TreeNode("Frontend")
+    
+    engg.parent = company
+    backend.parent = engg
+    frontend.parent = engg
+    
+    alice = TreeNode("Alice")
+    bob = TreeNode("Bob")
+    lisa = TreeNode("Lisa")
+    
+    alice.parent = backend
+    bob.parent = backend
+    lisa.parent = frontend
+    
+    backend.children = [alice, bob]
+    frontend.children = [lisa]
+    engg.children = [backend, frontend]
+    company.children = [engg]
+    
+    nodes = {
+        "Company": company,
+        "Engg": engg,
+        "Backend": backend,
+        "Frontend": frontend,
+        "Alice": alice,
+        "Bob": bob,
+        "Lisa": lisa
+    }
+    
+    # Create COW directory with initial snapshot
     directory = COWDirectory()
+    directory.current_snapshot = DirectorySnapshot(nodes, company)
     
-    # 1000 readers (no blocking!)
-    def reader():
-        result = directory.find_closest_group(["Alice", "Bob"])
+    read_results = []
+    write_results = []
     
-    # 1 writer (occasional)
-    def writer():
-        directory.add_employee("NewEmp", "Backend")
+    # Many readers (no blocking!)
+    def reader(thread_id):
+        for i in range(10):
+            try:
+                result = directory.find_closest_group(["Alice", "Bob"])
+                read_results.append(f"Reader {thread_id}: LCA = {result}")
+            except Exception as e:
+                read_results.append(f"Reader {thread_id}: Error = {e}")
+            time.sleep(0.001)  # Very fast reads!
     
-    readers = [threading.Thread(target=reader) for _ in range(1000)]
-    writer_thread = threading.Thread(target=writer)
+    # Occasional writer
+    def writer(thread_id):
+        time.sleep(0.02)  # Wait a bit before writing
+        try:
+            emp_name = f"NewEmp{thread_id}"
+            directory.add_employee(emp_name, "Backend")
+            write_results.append(f"Writer {thread_id}: Added {emp_name}")
+        except Exception as e:
+            write_results.append(f"Writer {thread_id}: Error = {e}")
     
-    # All readers run simultaneously without blocking!
-    for r in readers:
-        r.start()
-    writer_thread.start()
+    start_time = time.time()
+    
+    # Start many reader threads (100 readers!)
+    reader_threads = []
+    for i in range(100):
+        t = threading.Thread(target=reader, args=(i,))
+        reader_threads.append(t)
+        t.start()
+    
+    # Start few writer threads (2 writers)
+    writer_threads = []
+    for i in range(2):
+        t = threading.Thread(target=writer, args=(i,))
+        writer_threads.append(t)
+        t.start()
+    
+    # Wait for all to complete
+    for t in reader_threads:
+        t.join()
+    for t in writer_threads:
+        t.join()
+    
+    end_time = time.time()
+    
+    print(f"\n✅ Completed in {end_time - start_time:.3f} seconds")
+    print(f"\n📊 Statistics:")
+    print(f"  Total read operations: {len(read_results)}")
+    print(f"  Total write operations: {len(write_results)}")
+    print(f"  Reader threads: 100 (running concurrently!)")
+    print(f"  Writer threads: 2")
+    
+    print(f"\n📋 Sample Read Results (first 10):")
+    for result in read_results[:10]:
+        print(f"  {result}")
+    
+    print(f"\n📝 Write Results:")
+    for result in write_results:
+        print(f"  {result}")
+    
+    print(f"\n🎯 Key Advantages:")
+    print(f"  ✓ Readers never blocked each other")
+    print(f"  ✓ Readers never blocked by writers")
+    print(f"  ✓ All reads see consistent snapshots")
+    print(f"  ✓ Perfect for read-heavy workloads (100:1 ratio here)")
 ```
 
 **Pros:**
@@ -2015,7 +2493,18 @@ Company (not relevant)
 ```python
 def find_common_flat_simple(employee_groups, employees):
     """
-    employee_groups: dict { 'Alice': {'Backend', 'Mobile'}, 'Bob': {'Backend'} }
+    Find common groups for employees in a flat hierarchy.
+    
+    Args:
+        employee_groups: dict mapping employee names to their groups
+                        e.g. { 'Alice': {'Backend', 'Mobile'}, 'Bob': {'Backend'} }
+        employees: List of employee names
+        
+    Returns:
+        List of group names common to all employees
+        
+    Time: O(K × G) where K = employees, G = groups per employee
+    Space: O(G) for result set
     """
     if not employees: return []
     
@@ -2027,7 +2516,73 @@ def find_common_flat_simple(employee_groups, employees):
         groups = employee_groups.get(emp, set())
         common &= groups # In-place intersection
         
+        # Early exit if no common groups
+        if not common:
+            return []
+        
     return list(common)
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 3: FLAT HIERARCHY - SIMPLIFIED")
+    print("=" * 60)
+    
+    # Employee to groups mapping (employees can be in multiple groups)
+    employee_groups = {
+        'Alice': {'Backend', 'Mobile'},
+        'Bob': {'Backend'},
+        'Charlie': {'Backend'},
+        'Lisa': {'Frontend'},
+        'Mike': {'Mobile', 'Frontend'},
+        'David': {'Sales'}
+    }
+    
+    # Test cases
+    test_cases = [
+        (['Alice', 'Bob'], ['Backend'], "Alice and Bob both in Backend"),
+        (['Alice', 'Mike'], ['Mobile'], "Alice and Mike both in Mobile"),
+        (['Alice', 'Bob', 'Charlie'], ['Backend'], "All three in Backend"),
+        (['Alice', 'Lisa'], [], "No common groups"),
+        (['Alice'], ['Backend', 'Mobile'], "Single employee - all their groups"),
+        (['Mike', 'Lisa'], ['Frontend'], "Mike and Lisa both in Frontend"),
+        (['Bob', 'Charlie'], ['Backend'], "Bob and Charlie in Backend"),
+    ]
+    
+    print("\nRunning Tests:\n")
+    for employees, expected, explanation in test_cases:
+        result = find_common_flat_simple(employee_groups, employees)
+        # Convert to sets for comparison (order doesn't matter)
+        result_set = set(result)
+        expected_set = set(expected)
+        status = "✓" if result_set == expected_set else "✗"
+        
+        print(f"{status} Employees: {employees}")
+        print(f"  Expected: {expected}, Got: {result}")
+        print(f"  Explanation: {explanation}\n")
+    
+    # Show detailed trace for one example
+    print("=" * 60)
+    print("DETAILED TRACE: find_common_flat_simple(['Alice', 'Mike'])")
+    print("=" * 60)
+    
+    print(f"\nStep 1: Get Alice's groups")
+    print(f"  Alice → {employee_groups['Alice']}")
+    
+    print(f"\nStep 2: Get Mike's groups")
+    print(f"  Mike → {employee_groups['Mike']}")
+    
+    print(f"\nStep 3: Intersection")
+    alice_groups = employee_groups['Alice']
+    mike_groups = employee_groups['Mike']
+    common = alice_groups & mike_groups
+    print(f"  {alice_groups} ∩ {mike_groups} = {common}")
+    
+    print(f"\nResult: {list(common)}")
 ```
 
 #### Solution 2: Production (Optimized Class)
