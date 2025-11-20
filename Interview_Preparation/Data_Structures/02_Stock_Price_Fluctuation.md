@@ -806,27 +806,160 @@ Without synchronization:
 ```python
 import threading
 from typing import Optional
+import heapq
 
-class ThreadSafeStockSimple(StockPriceSimple):
+class ThreadSafeStockSimple:
+    """
+    Thread-safe stock price tracker using a simple lock.
+    
+    Uses a single lock to protect all operations.
+    Good for balanced read/write workloads.
+    """
+    
     def __init__(self):
-        super().__init__()
+        self.prices = {}  # timestamp -> price
+        self.latest_time = 0
+        self.min_heap = []  # (price, timestamp)
+        self.max_heap = []  # (-price, timestamp)
         self.lock = threading.Lock()
 
-    def update(self, timestamp, price):
+    def update(self, timestamp: int, price: int):
+        """Thread-safe update operation."""
         with self.lock:
-            super().update(timestamp, price)
+            # Update ground truth
+            self.prices[timestamp] = price
+            self.latest_time = max(self.latest_time, timestamp)
+            
+            # Push to heaps
+            heapq.heappush(self.min_heap, (price, timestamp))
+            heapq.heappush(self.max_heap, (-price, timestamp))
 
-    def current(self):
+    def current(self) -> int:
+        """Thread-safe current price query."""
         with self.lock:
-            return super().current()
+            return self.prices[self.latest_time]
     
-    def maximum(self):
+    def maximum(self) -> int:
+        """Thread-safe maximum price query."""
         with self.lock:
-            return super().maximum()
+            while True:
+                price, ts = self.max_heap[0]
+                if self.prices[ts] == -price:
+                    return -price
+                heapq.heappop(self.max_heap)
     
-    def minimum(self):
+    def minimum(self) -> int:
+        """Thread-safe minimum price query."""
         with self.lock:
-            return super().minimum()
+            while True:
+                price, ts = self.min_heap[0]
+                if self.prices[ts] == price:
+                    return price
+                heapq.heappop(self.min_heap)
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    import time
+    import concurrent.futures
+    
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 2: THREAD SAFETY - SIMPLIFIED")
+    print("=" * 60)
+    
+    tracker = ThreadSafeStockSimple()
+    results = []
+    errors = []
+    
+    # Writer threads - add price updates
+    def writer_thread(thread_id, num_updates):
+        for i in range(num_updates):
+            timestamp = thread_id * 100 + i
+            price = 50 + (thread_id * 10) + i
+            tracker.update(timestamp, price)
+            results.append(f"Writer {thread_id}: update({timestamp}, {price})")
+            time.sleep(0.001)
+    
+    # Reader threads - query prices
+    def reader_thread(thread_id, num_queries):
+        time.sleep(0.01)  # Let some updates happen first
+        for i in range(num_queries):
+            try:
+                current = tracker.current()
+                maximum = tracker.maximum()
+                minimum = tracker.minimum()
+                results.append(f"Reader {thread_id}: curr={current}, max={maximum}, min={minimum}")
+            except Exception as e:
+                errors.append(f"Reader {thread_id}: Error - {e}")
+            time.sleep(0.002)
+    
+    # Mixed thread - both reads and writes
+    def mixed_thread(thread_id):
+        for i in range(3):
+            # Write
+            tracker.update(500 + thread_id + i, 100 + i)
+            results.append(f"Mixed {thread_id}: Updated")
+            
+            # Read
+            try:
+                max_price = tracker.maximum()
+                results.append(f"Mixed {thread_id}: Max={max_price}")
+            except Exception as e:
+                errors.append(f"Mixed {thread_id}: Error - {e}")
+            
+            time.sleep(0.005)
+    
+    print("\n🧵 Starting concurrent operations...")
+    start_time = time.time()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        
+        # 3 writer threads
+        for i in range(3):
+            futures.append(executor.submit(writer_thread, i, 5))
+        
+        # 4 reader threads
+        for i in range(4):
+            futures.append(executor.submit(reader_thread, i, 5))
+        
+        # 2 mixed threads
+        for i in range(2):
+            futures.append(executor.submit(mixed_thread, i))
+        
+        # Wait for all to complete
+        concurrent.futures.wait(futures)
+    
+    end_time = time.time()
+    
+    print(f"\n✅ Completed in {end_time - start_time:.3f} seconds")
+    
+    print(f"\n📊 Statistics:")
+    print(f"  Total operations: {len(results)}")
+    print(f"  Errors: {len(errors)}")
+    print(f"  Success rate: {100 * (len(results) - len(errors)) / len(results):.1f}%")
+    
+    # Show sample results
+    print(f"\n📋 Sample Results (first 10):")
+    for result in results[:10]:
+        print(f"  {result}")
+    
+    if errors:
+        print(f"\n❌ Errors encountered:")
+        for error in errors[:5]:
+            print(f"  {error}")
+    else:
+        print(f"\n✅ No race conditions detected!")
+    
+    # Final state
+    print(f"\n📈 Final State:")
+    print(f"  Current price: {tracker.current()}")
+    print(f"  Maximum price: {tracker.maximum()}")
+    print(f"  Minimum price: {tracker.minimum()}")
+    print(f"  Total timestamps: {len(tracker.prices)}")
 ```
 
 #### Solution 2: Production (Read-Write Lock)
@@ -952,16 +1085,190 @@ Query: getMaxInRange(2, 4)
 
 #### Solution 1: Simplified (Interview Recommended)
 
-```python
-# Simplified Segment Tree Node
-class Node:
-    def __init__(self, start, end):
-        self.start, self.end = start, end
-        self.max_val = 0
-        self.left = self.right = None
+**Concept:** For interview, explain the segment tree approach but implement a simpler dictionary-based solution that's easier to code in 15 minutes.
 
-# Recursive build and query logic would go here
-# (Usually too long to write fully in 15 mins, focus on concept)
+```python
+from typing import Dict, List
+
+class StockPriceRangeSimple:
+    """
+    Simplified stock price tracker with range queries.
+    
+    Uses dictionary for O(log N) range queries via sorted keys.
+    Trade-off: Not as efficient as segment tree, but much simpler to code.
+    """
+    
+    def __init__(self):
+        self.timestamp_to_price: Dict[int, int] = {}
+        self.latest_timestamp = 0
+    
+    def update(self, timestamp: int, price: int) -> None:
+        """
+        Update price at timestamp.
+        
+        Time: O(1)
+        Space: O(1)
+        """
+        self.timestamp_to_price[timestamp] = price
+        self.latest_timestamp = max(self.latest_timestamp, timestamp)
+    
+    def current(self) -> int:
+        """Return price at latest timestamp."""
+        return self.timestamp_to_price[self.latest_timestamp]
+    
+    def maximum(self) -> int:
+        """Return maximum price across all timestamps."""
+        return max(self.timestamp_to_price.values())
+    
+    def minimum(self) -> int:
+        """Return minimum price across all timestamps."""
+        return min(self.timestamp_to_price.values())
+    
+    def getMaxInRange(self, start_ts: int, end_ts: int) -> int:
+        """
+        Get maximum price in timestamp range [start_ts, end_ts].
+        
+        Time: O(N) in worst case (iterates through timestamps)
+        Space: O(1)
+        
+        Note: For production, use Segment Tree for O(log N) queries.
+        This simplified version is easier to code in interviews.
+        """
+        max_price = float('-inf')
+        
+        for timestamp, price in self.timestamp_to_price.items():
+            if start_ts <= timestamp <= end_ts:
+                max_price = max(max_price, price)
+        
+        return max_price if max_price != float('-inf') else 0
+    
+    def getMinInRange(self, start_ts: int, end_ts: int) -> int:
+        """
+        Get minimum price in timestamp range [start_ts, end_ts].
+        
+        Time: O(N)
+        Space: O(1)
+        """
+        min_price = float('inf')
+        
+        for timestamp, price in self.timestamp_to_price.items():
+            if start_ts <= timestamp <= end_ts:
+                min_price = min(min_price, price)
+        
+        return min_price if min_price != float('inf') else 0
+    
+    def getAverageInRange(self, start_ts: int, end_ts: int) -> float:
+        """
+        Get average price in timestamp range.
+        
+        Time: O(N)
+        Space: O(1)
+        """
+        total = 0
+        count = 0
+        
+        for timestamp, price in self.timestamp_to_price.items():
+            if start_ts <= timestamp <= end_ts:
+                total += price
+                count += 1
+        
+        return total / count if count > 0 else 0.0
+
+
+# ============================================
+# COMPLETE RUNNABLE EXAMPLE
+# ============================================
+
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("FOLLOW-UP 3: RANGE QUERIES - SIMPLIFIED")
+    print("=" * 60)
+    
+    tracker = StockPriceRangeSimple()
+    
+    # Add some stock prices at different timestamps
+    print("\n📊 Adding stock prices...")
+    prices_data = [
+        (5, 100),
+        (10, 150),
+        (15, 80),
+        (20, 200),
+        (25, 120),
+        (30, 90),
+        (35, 180)
+    ]
+    
+    for ts, price in prices_data:
+        tracker.update(ts, price)
+        print(f"  t={ts}: ${price}")
+    
+    # Test 1: Basic operations
+    print("\n[Test 1] Basic Operations")
+    print("-" * 40)
+    print(f"Current price: ${tracker.current()}")
+    print(f"Maximum price: ${tracker.maximum()}")
+    print(f"Minimum price: ${tracker.minimum()}")
+    
+    # Test 2: Range queries
+    print("\n[Test 2] Range Queries")
+    print("-" * 40)
+    
+    test_ranges = [
+        (5, 15, 150, "Early period"),
+        (10, 20, 200, "Middle period"),
+        (15, 25, 200, "Peak period"),
+        (25, 35, 180, "Late period"),
+        (5, 35, 200, "Full range"),
+        (5, 5, 100, "Single timestamp"),
+    ]
+    
+    for start, end, expected_max, description in test_ranges:
+        result = tracker.getMaxInRange(start, end)
+        status = "✓" if result == expected_max else "✗"
+        print(f"{status} Range [{start}, {end}] ({description})")
+        print(f"  Max price: ${result} (expected ${expected_max})")
+    
+    # Test 3: Min and Average in ranges
+    print("\n[Test 3] Min and Average Queries")
+    print("-" * 40)
+    
+    test_range = (10, 25)
+    max_val = tracker.getMaxInRange(*test_range)
+    min_val = tracker.getMinInRange(*test_range)
+    avg_val = tracker.getAverageInRange(*test_range)
+    
+    print(f"Range: [{test_range[0]}, {test_range[1]}]")
+    print(f"  Maximum: ${max_val}")
+    print(f"  Minimum: ${min_val}")
+    print(f"  Average: ${avg_val:.2f}")
+    
+    # Test 4: Edge cases
+    print("\n[Test 4] Edge Cases")
+    print("-" * 40)
+    
+    # Range with no data
+    result = tracker.getMaxInRange(40, 50)
+    print(f"Empty range [40, 50]: ${result} (expected 0)")
+    
+    # Single point
+    result = tracker.getMaxInRange(20, 20)
+    print(f"Single point [20, 20]: ${result} (expected 200)")
+    
+    # Price correction
+    print("\n[Test 5] Price Correction")
+    print("-" * 40)
+    print(f"Before: Max in [10,20] = ${tracker.getMaxInRange(10, 20)}")
+    tracker.update(15, 250)  # Update timestamp 15 from 80 to 250
+    print(f"After updating t=15 to $250:")
+    print(f"  Max in [10,20] = ${tracker.getMaxInRange(10, 20)}")
+    
+    print("\n" + "=" * 60)
+    print("✅ All range query tests completed!")
+    print("=" * 60)
+    
+    print("\n💡 Note: This simplified O(N) solution is easier to code")
+    print("   in interviews. For production, use Segment Tree for")
+    print("   O(log N) range queries (see Solution 2).")
 ```
 
 #### Solution 2: Production (Full Segment Tree)
