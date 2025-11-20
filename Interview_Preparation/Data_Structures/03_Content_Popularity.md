@@ -29,25 +29,315 @@ Implement a data structure to track the popularity of content items (e.g., pages
 **Data Structure Design:**
 We need a **Doubly Linked List (DLL)** where each node represents a "Bucket" of items with the same popularity count. Buckets are sorted by count.
 
+---
+
+## 📊 Overall Architecture Diagram
+
 ```text
-Initial State: Empty
+┌─────────────────────────────────────────────────────────────────┐
+│                    POPULARITY TRACKER                           │
+│                                                                 │
+│  HashMap: key_to_node                                          │
+│  ┌──────────────────────────────────────────────────┐          │
+│  │  "A" → Node(count=2)  ──────────┐                │          │
+│  │  "B" → Node(count=2)  ──────┐   │                │          │
+│  │  "C" → Node(count=1)  ────┐ │   │                │          │
+│  └───────────────────────────┼─┼───┼────────────────┘          │
+│                              │ │   │                            │
+│  Doubly-Linked List (Sorted by Count):                         │
+│                              ↓ ↓   ↓                            │
+│  ┌──────┐     ┌─────────────────┐     ┌─────────────────┐     ┌──────┐
+│  │ Head │◄───►│  Bucket: count=1│◄───►│  Bucket: count=2│◄───►│ Tail │
+│  │ (-∞) │     │   keys: {C}     │     │   keys: {A, B}  │     │ (∞)  │
+│  └──────┘     └─────────────────┘     └─────────────────┘     └──────┘
+│                       ↑                         ↑                       │
+│                       └─────────────────────────┘                       │
+│                     prev/next pointers (bidirectional)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-1. increase("A") -> A has 1
-   [Head] <-> [Bucket: 1 | {A}] <-> [Tail]
+**Key Components:**
+1. **HashMap (`key_to_node`)**: O(1) lookup of any content item
+2. **Doubly-Linked List**: Maintains sorted order of popularity counts
+3. **Bucket Nodes**: Each holds items with the same count
+4. **Sentinel Nodes**: Head and Tail simplify edge case handling
 
-2. increase("B") -> B has 1
-   [Head] <-> [Bucket: 1 | {A, B}] <-> [Tail]
+---
 
-3. increase("B") -> B has 2. Move B to next bucket.
-   [Head] <-> [Bucket: 1 | {A}] <-> [Bucket: 2 | {B}] <-> [Tail]
+## 🔍 Detailed Node Structure
 
-4. increase("B") -> B has 3. Create new bucket.
-   [Head] <-> [Bucket: 1 | {A}] <-> [Bucket: 2 | {}] <-> [Bucket: 3 | {B}] <-> [Tail]
-                                          ↑ (Empty, remove it)
-   [Head] <-> [Bucket: 1 | {A}] <-> [Bucket: 3 | {B}] <-> [Tail]
+```text
+┌───────────────────────────────────┐
+│        Bucket Node                │
+├───────────────────────────────────┤
+│  count: int (popularity level)    │
+│  keys: Set[str] (content items)   │
+│  prev: Node* (previous bucket)    │
+│  next: Node* (next bucket)        │
+└───────────────────────────────────┘
 
-5. decrease("A") -> A has 0. Remove A.
-   [Head] <-> [Bucket: 3 | {B}] <-> [Tail]
+Example:
+┌───────────────────────────────────┐
+│  count: 3                         │
+│  keys: {"post1", "video5"}        │
+│  prev: ───► [Node with count=2]   │
+│  next: ───► [Node with count=4]   │
+└───────────────────────────────────┘
+```
+
+**Why Sets?**
+- O(1) add/remove of items within a bucket
+- No duplicates (each content ID appears once)
+- Unordered (we don't care about order within same popularity)
+
+---
+
+## 📝 Step-by-Step Operation Trace
+
+### **Initial State: Empty**
+
+```text
+HashMap: {}
+
+DLL:
+┌──────┐          ┌──────┐
+│ Head │◄────────►│ Tail │
+│ (-∞) │          │ (∞)  │
+└──────┘          └──────┘
+```
+
+---
+
+### **Step 1: increase("A") → A has count=1**
+
+**Operation:**
+- A is new (not in HashMap)
+- Need bucket for count=1
+- head.next = Tail (no bucket exists)
+- Create new bucket after Head
+
+**Result:**
+```text
+HashMap: {A → Node(count=1)}
+
+DLL:
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 1      │◄───►│ Tail │
+│ (-∞) │     │  keys: {A}      │     │ (∞)  │
+└──────┘     └─────────────────┘     └──────┘
+               ↑
+               └─ A points here
+```
+
+---
+
+### **Step 2: increase("B") → B has count=1**
+
+**Operation:**
+- B is new (not in HashMap)
+- Need bucket for count=1
+- head.next = Node(count=1) ✓ (reuse existing!)
+- Add B to existing bucket
+
+**Result:**
+```text
+HashMap: {A → Node(count=1), B → Node(count=1)}
+
+DLL:
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 1      │◄───►│ Tail │
+│ (-∞) │     │  keys: {A, B}   │     │ (∞)  │
+└──────┘     └─────────────────┘     └──────┘
+               ↑         ↑
+               │         └─ B points here
+               └─ A points here
+```
+
+---
+
+### **Step 3: increase("B") → B has count=2**
+
+**Operation:**
+- B exists at count=1
+- Need to move to count=2
+- current_node.next = Tail (no count=2 bucket)
+- Create new bucket after current_node
+- Move B from count=1 to count=2
+- Bucket count=1 still has A, so keep it
+
+**Result:**
+```text
+HashMap: {A → Node(count=1), B → Node(count=2)}
+
+DLL:
+┌──────┐     ┌─────────────────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 1      │◄───►│  Bucket: 2      │◄───►│ Tail │
+│ (-∞) │     │  keys: {A}      │     │  keys: {B}      │     │ (∞)  │
+└──────┘     └─────────────────┘     └─────────────────┘     └──────┘
+               ↑                        ↑
+               └─ A points here         └─ B points here
+```
+
+---
+
+### **Step 4: increase("B") → B has count=3**
+
+**Operation:**
+- B exists at count=2
+- Need to move to count=3
+- current_node.next = Tail (no count=3 bucket)
+- Create new bucket after count=2
+- Move B from count=2 to count=3
+- Bucket count=2 is now EMPTY → **DELETE IT!**
+
+**During:**
+```text
+┌──────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Bucket:1│◄───►│Bucket:2│◄───►│Bucket:3│◄───►│ Tail │
+│      │     │ {A}    │     │  {}    │     │ {B}    │     │      │
+└──────┘     └────────┘     └────────┘     └────────┘     └──────┘
+                              ↑ EMPTY!
+                              Remove this
+```
+
+**After Cleanup:**
+```text
+HashMap: {A → Node(count=1), B → Node(count=3)}
+
+DLL:
+┌──────┐     ┌─────────────────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 1      │◄───►│  Bucket: 3      │◄───►│ Tail │
+│ (-∞) │     │  keys: {A}      │     │  keys: {B}      │     │ (∞)  │
+└──────┘     └─────────────────┘     └─────────────────┘     └──────┘
+               ↑                        ↑
+               └─ A (count=1)           └─ B (count=3) ← MOST POPULAR
+```
+
+---
+
+### **Step 5: decrease("A") → A has count=0 (REMOVE)**
+
+**Operation:**
+- A exists at count=1
+- New count = 0 → **Delete from tracker**
+- Remove A from bucket
+- Bucket count=1 is now EMPTY → **DELETE IT!**
+- Delete A from HashMap
+
+**Result:**
+```text
+HashMap: {B → Node(count=3)}
+
+DLL:
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 3      │◄───►│ Tail │
+│ (-∞) │     │  keys: {B}      │     │ (∞)  │
+└──────┘     └─────────────────┘     └──────┘
+               ↑
+               └─ B (count=3) ← MOST POPULAR
+```
+
+---
+
+## 🎯 mostPopular() Query Visualization
+
+**Question:** How do we find the most popular item in O(1)?
+
+**Answer:** It's always in `tail.prev` (the last bucket before the sentinel)!
+
+```text
+DLL:
+┌──────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Bucket:1│◄───►│Bucket:5│◄───►│Bucket:9│◄───►│ Tail │
+│      │     │ {C}    │     │ {A}    │     │ {B, D} │     │      │
+└──────┘     └────────┘     └────────┘     └────────┘     └──────┘
+                                              ↑              ↑
+                                              │              │
+                                            tail.prev ────────┘
+
+mostPopular() = tail.prev.get_any_key() = "B" or "D"
+                                          (either valid)
+```
+
+**Time Complexity:** O(1) - direct pointer access!
+
+---
+
+## 🔄 Pointer Manipulation Details
+
+### **Adding a New Bucket Between Two Existing Nodes**
+
+**Scenario:** Insert count=4 bucket between count=3 and count=5
+
+**Before:**
+```text
+┌────────────┐          ┌────────────┐
+│ Bucket: 3  │◄────────►│ Bucket: 5  │
+│ {A}        │          │ {B}        │
+└────────────┘          └────────────┘
+     prev3                   prev5
+      next ────────────────► prev
+      prev ◄──────────────── next
+```
+
+**Step 1: Create new node**
+```text
+┌────────────┐
+│ Bucket: 4  │  (new_node)
+│ {C}        │
+└────────────┘
+  prev = None
+  next = None
+```
+
+**Step 2: Link new_node**
+```text
+new_node.prev = prev3  (point to left)
+new_node.next = prev5  (point to right)
+```
+
+**Step 3: Update neighbors**
+```text
+prev3.next = new_node  (left neighbor points to new)
+prev5.prev = new_node  (right neighbor points to new)
+```
+
+**After:**
+```text
+┌────────────┐     ┌────────────┐     ┌────────────┐
+│ Bucket: 3  │◄───►│ Bucket: 4  │◄───►│ Bucket: 5  │
+│ {A}        │     │ {C}        │     │ {B}        │
+└────────────┘     └────────────┘     └────────────┘
+```
+
+---
+
+### **Removing an Empty Bucket**
+
+**Before:**
+```text
+┌────────────┐     ┌────────────┐     ┌────────────┐
+│ Bucket: 2  │◄───►│ Bucket: 3  │◄───►│ Bucket: 4  │
+│ {A}        │     │ {}         │     │ {B}        │
+└────────────┘     └────────────┘     └────────────┘
+                       ↑ EMPTY!
+                     to_remove
+```
+
+**Operation:**
+```python
+to_remove.prev.next = to_remove.next  # Skip over node
+to_remove.next.prev = to_remove.prev  # Link backwards
+```
+
+**After:**
+```text
+┌────────────┐                    ┌────────────┐
+│ Bucket: 2  │◄──────────────────►│ Bucket: 4  │
+│ {A}        │                    │ {B}        │
+└────────────┘                    └────────────┘
+
+Node(count=3) is now unreachable → garbage collected
 ```
 
 ---
@@ -310,117 +600,248 @@ if __name__ == "__main__":
 
 ---
 
-## 🔍 Explanation with Example
+## 🔍 Edge Cases with Detailed Visualizations
 
-Let's trace through a detailed example step by step to understand how the algorithm works:
+### **Edge Case 1: First Item Addition**
 
-**Operations:**
-1. `increasePopularity("A")`  
-2. `increasePopularity("B")`  
-3. `increasePopularity("B")`  
-4. `mostPopular()`  
-5. `increasePopularity("A")`  
-6. `decreasePopularity("B")`
+```text
+Before:
+┌──────┐          ┌──────┐
+│ Head │◄────────►│ Tail │
+└──────┘          └──────┘
 
----
+Operation: increase("A")
 
-**Initial State:**
-```
-key_to_node = {}
-DLL: [Head] <-> [Tail]
-```
+Checks:
+1. Is A in HashMap? NO → New item
+2. Does head.next have count=1? NO (head.next = Tail)
+3. Action: Create new bucket with count=1
 
----
+After:
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Bucket: 1      │◄───►│ Tail │
+│      │     │  keys: {A}      │     │      │
+└──────┘     └─────────────────┘     └──────┘
 
-**Operation 1: increasePopularity("A")**
-
-- A is new (not in `key_to_node`)
-- Need bucket for count=1
-- Check `head.next`: Is it count=1? No (it's Tail)
-- Create new bucket for count=1 after Head
-- Add A to this bucket
-
-```
-key_to_node = {A: Node(count=1)}
-DLL: [Head] <-> [count=1: {A}] <-> [Tail]
+Complexity: O(1) - constant pointer updates
 ```
 
 ---
 
-**Operation 2: increasePopularity("B")**
+### **Edge Case 2: Gap in Counts (1 → 5 → 10)**
 
-- B is new (not in `key_to_node`)
-- Need bucket for count=1
-- Check `head.next`: Is it count=1? Yes! Use existing bucket
-- Add B to this bucket
+**Scenario:** Items jump counts, creating gaps
 
+```text
+State: Items with counts 1, 5, 10
+┌──────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:1 │◄───►│Count:5 │◄───►│Count:10│◄───►│ Tail │
+│      │     │  {A}   │     │  {B}   │     │  {C}   │     │      │
+└──────┘     └────────┘     └────────┘     └────────┘     └──────┘
+
+Operation: increase("A")  # A: 1 → 2
+
+Question: Does bucket for count=2 exist?
+Answer: NO! (next bucket is count=5)
+
+Action: Create new bucket for count=2 between count=1 and count=5
+
+After:
+┌──────┐     ┌────────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:2 │◄───►│Count:5 │◄───►│Count:10│◄───►│ Tail │
+│      │     │  {A}   │     │  {B}   │     │  {C}   │     │      │
+└──────┘     └────────┘     └────────┘     └────────┘     └──────┘
+              ↑ NEW!
+
+Note: count=1 bucket removed (was empty)
 ```
-key_to_node = {A: Node(count=1), B: Node(count=1)}
-DLL: [Head] <-> [count=1: {A, B}] <-> [Tail]
+
+**Why This Works:**
+- We only move to adjacent counts (+1 or -1)
+- If target bucket doesn't exist, create it
+- Maintains sorted order automatically
+
+---
+
+### **Edge Case 3: Mass Deletion (All Items at Same Count)**
+
+```text
+Before: 3 items, all with count=5
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 5       │◄───►│ Tail │
+│      │     │  {A, B, C}      │     │      │
+└──────┘     └─────────────────┘     └──────┘
+
+Operation Sequence:
+1. decrease("A")  # A: 5 → 4
+2. decrease("B")  # B: 5 → 4
+3. decrease("C")  # C: 5 → 4
+
+Step 1: decrease("A")
+┌──────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:4 │◄───►│Count:5 │◄───►│ Tail │
+│      │     │  {A}   │     │ {B, C} │     │      │
+└──────┘     └────────┘     └────────┘     └──────┘
+
+Step 2: decrease("B")
+┌──────┐     ┌─────────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│  Count: 4   │◄───►│Count:5 │◄───►│ Tail │
+│      │     │   {A, B}    │     │  {C}   │     │      │
+└──────┘     └─────────────┘     └────────┘     └──────┘
+
+Step 3: decrease("C")
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 4       │◄───►│ Tail │
+│      │     │   {A, B, C}     │     │      │
+└──────┘     └─────────────────┘     └──────┘
+              ↑
+              Count=5 bucket removed (was empty)
 ```
 
 ---
 
-**Operation 3: increasePopularity("B")**
+### **Edge Case 4: Decrease to Zero (Complete Removal)**
 
-- B exists at count=1
-- Need to move to count=2
-- current_node = Node(count=1)
-- Check current_node.next: Is it count=2? No (it's Tail)
-- Create new bucket for count=2 after current_node
-- Move B from count=1 bucket to count=2 bucket
-- count=1 bucket still has A, so don't remove it
+```text
+Before:
+┌──────┐     ┌────────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:1 │◄───►│Count:3 │◄───►│ Tail │
+│      │     │  {A}   │     │  {B}   │     │      │
+└──────┘     └────────┘     └────────┘     └──────┘
 
-```
-key_to_node = {A: Node(count=1), B: Node(count=2)}
-DLL: [Head] <-> [count=1: {A}] <-> [count=2: {B}] <-> [Tail]
-```
+Operation: decrease("A")  # A: 1 → 0
 
----
+Checks:
+1. Is A in HashMap? YES
+2. Current count = 1
+3. New count = 0 → REMOVE COMPLETELY
 
-**Operation 4: mostPopular()**
+Actions:
+1. Remove A from bucket
+2. Delete A from HashMap
+3. Check if bucket is empty → YES
+4. Remove bucket from DLL
 
-- Look at `tail.prev`
-- tail.prev = Node(count=2)
-- Return any key from this bucket: "B"
+After:
+┌──────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:3 │◄───►│ Tail │
+│      │     │  {B}   │     │      │
+└──────┘     └────────┘     └──────┘
 
-**Result:** "B"
-
----
-
-**Operation 5: increasePopularity("A")**
-
-- A exists at count=1
-- Need to move to count=2
-- current_node = Node(count=1)
-- Check current_node.next: Is it count=2? Yes! Use existing bucket
-- Move A from count=1 bucket to count=2 bucket
-- count=1 bucket is now empty → remove it from DLL
-
-```
-key_to_node = {A: Node(count=2), B: Node(count=2)}
-DLL: [Head] <-> [count=2: {A, B}] <-> [Tail]
+HashMap: {B: Node(count=3)}
 ```
 
 ---
 
-**Operation 6: decreasePopularity("B")**
+### **Edge Case 5: Single Item Tracker**
 
-- B exists at count=2
-- Need to move to count=1
-- current_node = Node(count=2)
-- Remove B from count=2 bucket
-- Check current_node.prev: Is it count=1? No (it's Head)
-- Create new bucket for count=1 after Head (before count=2)
-- Add B to count=1 bucket
-- count=2 bucket still has A, so don't remove it
+**Scenario:** Only one item exists
 
+```text
+State: One item with count=7
+┌──────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:7 │◄───►│ Tail │
+│      │     │  {X}   │     │      │
+└──────┘     └────────┘     └──────┘
+
+mostPopular() = "X"  ✓ (tail.prev.get_any_key())
+
+decrease("X") # X: 7 → 6
+┌──────┐     ┌────────┐     ┌──────┐
+│ Head │◄───►│Count:6 │◄───►│ Tail │
+│      │     │  {X}   │     │      │
+└──────┘     └────────┘     └──────┘
+
+decrease("X") repeatedly until count=0:
+┌──────┐          ┌──────┐
+│ Head │◄────────►│ Tail │
+└──────┘          └──────┘
+
+mostPopular() = None  ✓ (head.next = tail, empty)
 ```
-key_to_node = {A: Node(count=2), B: Node(count=1)}
-DLL: [Head] <-> [count=1: {B}] <-> [count=2: {A}] <-> [Tail]
-```
 
-**Final State:** A has count=2 (most popular), B has count=1
+---
+
+## 🔄 Complete Operation Trace with All Details
+
+### **Full Example Sequence**
+
+```text
+Operations:
+1. increase("A")
+2. increase("B")
+3. increase("B")
+4. mostPopular()
+5. increase("A")
+6. decrease("B")
+
+══════════════════════════════════════════════════════════
+
+[0] Initial State
+HashMap: {}
+┌──────┐          ┌──────┐
+│ Head │◄────────►│ Tail │
+└──────┘          └──────┘
+
+══════════════════════════════════════════════════════════
+
+[1] increase("A")
+HashMap: {A → Node(count=1)}
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 1       │◄───►│ Tail │
+│      │     │  keys: {A}      │     │      │
+└──────┘     └─────────────────┘     └──────┘
+
+══════════════════════════════════════════════════════════
+
+[2] increase("B")
+HashMap: {A → Node(count=1), B → Node(count=1)}
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 1       │◄───►│ Tail │
+│      │     │  keys: {A, B}   │     │      │
+└──────┘     └─────────────────┘     └──────┘
+
+══════════════════════════════════════════════════════════
+
+[3] increase("B")  # B: 1 → 2
+HashMap: {A → Node(count=1), B → Node(count=2)}
+┌──────┐     ┌────────────┐     ┌────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 1  │◄───►│  Count: 2  │◄───►│ Tail │
+│      │     │  keys: {A} │     │  keys: {B} │     │      │
+└──────┘     └────────────┘     └────────────┘     └──────┘
+
+══════════════════════════════════════════════════════════
+
+[4] mostPopular()
+Returns: "B" (from tail.prev = Node(count=2))
+Time: O(1)
+
+══════════════════════════════════════════════════════════
+
+[5] increase("A")  # A: 1 → 2 (reuses existing bucket)
+HashMap: {A → Node(count=2), B → Node(count=2)}
+┌──────┐     ┌─────────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 2       │◄───►│ Tail │
+│      │     │  keys: {A, B}   │     │      │
+└──────┘     └─────────────────┘     └──────┘
+              ↑ Count=1 bucket removed (was empty)
+
+══════════════════════════════════════════════════════════
+
+[6] decrease("B")  # B: 2 → 1 (creates new bucket)
+HashMap: {A → Node(count=2), B → Node(count=1)}
+┌──────┐     ┌────────────┐     ┌────────────┐     ┌──────┐
+│ Head │◄───►│  Count: 1  │◄───►│  Count: 2  │◄───►│ Tail │
+│      │     │  keys: {B} │     │  keys: {A} │     │      │
+└──────┘     └────────────┘     └────────────┘     └──────┘
+
+══════════════════════════════════════════════════════════
+
+Final State:
+- A has count=2 (most popular)
+- B has count=1
+- mostPopular() returns "A"
+```
 
 ---
 
@@ -462,114 +883,386 @@ DLL: [Head] <-> [count=1: {B}] <-> [count=2: {A}] <-> [Tail]
 **Problem:**
 > "Currently `mostPopular()` returns *any* max item. Change it to return the one that reached that popularity **most recently**."
 
-**Solution:**
-Instead of a standard `Set`, use an `OrderedDict` (or Python's insertion-ordered `dict`) inside the Node.
-- **Add:** Append to end (newest).
-- **Access:** `next(reversed(node.keys))` gets the last inserted item.
+**Key Insight:**
+We need to maintain **insertion order** within each bucket so we can track which item reached the current popularity level most recently.
+
+**Solution Approach:**
+Instead of using a standard `Set` (which has no ordering), use Python's `dict` (which maintains insertion order since Python 3.7+) or `OrderedDict` for explicit ordering.
+
+**Data Structure Modification:**
+```text
+Before: Bucket stores Set {A, B, C} (unordered)
+After:  Bucket stores Dict {"A": True, "B": True, "C": True} (insertion-ordered)
+
+When we add a key:
+- Append to the end of the dict → "newest" item
+- When we query: next(reversed(node.keys)) → gets last inserted
+```
+
+**Implementation:**
 
 ```python
+from typing import Optional
+
 class RecencyNode(Node):
-    def __init__(self, count):
-        super().__init__(count)
-        self.keys = {}  # Ordered Dict
-        
-    def add_key(self, key):
-        self.keys[key] = True  # Append to end
-        
-    def remove_key(self, key):
+    """
+    Enhanced Node that maintains insertion order of keys.
+    Uses dict instead of set to track when items reached this popularity.
+    """
+    def __init__(self, count: int = 0):
+        self.count = count
+        self.keys = {}  # Ordered dict: {key: True}
+        self.prev: Optional['RecencyNode'] = None
+        self.next: Optional['RecencyNode'] = None
+
+    def add_key(self, key: str):
+        """Add key to end (most recent)."""
+        self.keys[key] = True  # Append to end maintains insertion order
+
+    def remove_key(self, key: str):
+        """Remove key if exists."""
         if key in self.keys:
             del self.keys[key]
-            
+
+    def is_empty(self):
+        return len(self.keys) == 0
+
     def get_newest_key(self):
-        # Return last key (most recent)
+        """Return the most recently added key (LIFO within bucket)."""
         return next(reversed(self.keys)) if self.keys else None
 
+
 class RecencyTracker(PopularityTracker):
-    # Override _add_node_after to use RecencyNode
-    def _add_node_after(self, prev_node, count):
+    """
+    Popularity tracker that returns the most recently updated item
+    when multiple items have the same max popularity.
+    """
+
+    def _add_node_after(self, prev_node: RecencyNode, count: int) -> RecencyNode:
+        """Create and insert a RecencyNode after prev_node."""
         new_node = RecencyNode(count)
-        
-        # Link the new node into the DLL
         next_node = prev_node.next
-        
-        # Update forward links
+
+        # Link new node into DLL
         prev_node.next = new_node
         new_node.prev = prev_node
-        
-        # Update backward links
         new_node.next = next_node
         next_node.prev = new_node
-        
+
         return new_node
-        
-    def mostPopular(self):
-        if self.tail.prev == self.head: return None
-        return self.tail.prev.get_newest_key()
+
+    def mostPopular(self) -> Optional[str]:
+        """
+        Return the most recently updated item with max popularity.
+        Time: O(1)
+        """
+        if self.tail.prev == self.head:
+            return None  # Empty tracker
+        return self.tail.prev.get_newest_key()  # Most recent in max bucket
 ```
+
+**Example Trace:**
+
+```text
+Operations:
+1. increase("A")  # A:1
+2. increase("B")  # B:1
+3. increase("A")  # A:2 (moved to bucket 2)
+4. increase("B")  # B:2 (moved to bucket 2 AFTER A)
+
+Bucket State (count=2):
+keys = {"A": True, "B": True}
+        ↑ added first   ↑ added second (most recent)
+
+mostPopular() returns "B" (most recently updated)
+```
+
+**Complexity Analysis:**
+- **Time Complexity:**
+  - `increase()`: O(1) - dict append is O(1) amortized
+  - `decrease()`: O(1) - dict deletion is O(1) average
+  - `mostPopular()`: O(1) - `next(reversed())` is O(1)
+- **Space Complexity:** O(N) - same as original (dict overhead ~same as set)
+
+**Trade-offs:**
+- **Pros:** Deterministic tie-breaking based on recency
+- **Cons:** Slightly more memory overhead (dict vs set) and marginally slower operations due to ordering maintenance
 
 ---
 
 ### Follow-up 2: Get Top-K Popular Items
 
 **Problem:**
-> "Implement `getTopK(k)` to return the k most popular items."
+> "Implement `getTopK(k)` to return the k most popular items in descending order of popularity."
 
-**Challenge:**
-We need to traverse from the tail backwards.
+**Key Insight:**
+The DLL is already sorted by popularity (ascending from head to tail). We traverse backwards from `tail.prev` to collect the top-k items.
 
 **Algorithm:**
-1. Start at `tail.prev`.
-2. Take all items from this bucket.
-3. If we need more, move to `node.prev`.
-4. Repeat until we have k items or hit head.
+1. Start at the maximum bucket (`tail.prev`)
+2. Collect all items from this bucket
+3. If we have fewer than k items, move to previous bucket (`node.prev`)
+4. Repeat until we have k items or reach head
+5. Return list of top-k items
+
+**Visualization:**
+
+```text
+DLL State:
+┌──────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌──────┐
+│ Head │◄─│Count:2 │◄─│Count:5 │◄─│Count:8 │◄─│ Tail │
+│      │  │ {C, D} │  │ {B}    │  │ {A, E} │  │      │
+└──────┘  └────────┘  └────────┘  └────────┘  └──────┘
+                                      ↑
+                                   Start here (tail.prev)
+
+getTopK(3):
+Step 1: current = Count:8, take {A, E} → result = [A, E]
+Step 2: Need 1 more, current = Count:5, take {B} → result = [A, E, B]
+Return: [A, E, B]  (top 3 by popularity)
+```
+
+**Implementation:**
 
 ```python
+class PopularityTracker:
+    # ... existing methods ...
+
     def getTopK(self, k: int) -> list:
+        """
+        Return k most popular items in descending popularity order.
+
+        Args:
+            k: Number of top items to return
+
+        Returns:
+            List of up to k content IDs with highest popularity
+
+        Time: O(B + K) where B = number of buckets traversed
+        Space: O(K) for result list
+        """
+        if k <= 0:
+            return []
+
         result = []
         current = self.tail.prev
-        
+
+        # Traverse backwards from max bucket
         while current != self.head and len(result) < k:
-            # Get items from current bucket
-            # Note: Order depends on set implementation (random or insertion)
+            # Get all items from current bucket
             bucket_items = list(current.keys)
-            
-            # Take needed amount
+
+            # Calculate how many more items we need
             needed = k - len(result)
+
+            # Take up to 'needed' items from this bucket
             result.extend(bucket_items[:needed])
-            
+
+            # Move to next lower popularity bucket
             current = current.prev
-            
+
+        return result
+
+    def getTopKWithCounts(self, k: int) -> list:
+        """
+        Return k most popular items WITH their popularity counts.
+
+        Returns:
+            List of (content_id, count) tuples
+
+        Example: [("A", 10), ("B", 8), ("C", 8)]
+        """
+        if k <= 0:
+            return []
+
+        result = []
+        current = self.tail.prev
+
+        while current != self.head and len(result) < k:
+            bucket_items = list(current.keys)
+            needed = k - len(result)
+
+            # Add items with their count
+            for item in bucket_items[:needed]:
+                result.append((item, current.count))
+
+            current = current.prev
+
         return result
 ```
 
-**Complexity:** O(K) (assuming buckets aren't huge relative to K).
+**Example Usage:**
+
+```python
+tracker = PopularityTracker()
+
+# Setup: A:5, B:3, C:3, D:1
+for _ in range(5): tracker.increasePopularity("A")
+for _ in range(3): tracker.increasePopularity("B")
+for _ in range(3): tracker.increasePopularity("C")
+tracker.increasePopularity("D")
+
+print(tracker.getTopK(2))
+# Output: ["A", "B"] or ["A", "C"] (A is always first, B/C are tied)
+
+print(tracker.getTopKWithCounts(3))
+# Output: [("A", 5), ("B", 3), ("C", 3)]
+```
+
+**Complexity Analysis:**
+- **Time Complexity:**
+  - **Best Case:** O(1) - if top bucket has ≥ k items
+  - **Average Case:** O(B) where B = number of buckets traversed
+  - **Worst Case:** O(N) - if each item is in a separate bucket and k = N
+  - **Practical:** O(K) when buckets are reasonably populated
+
+- **Space Complexity:** O(K) - result list
+
+**Why Not O(K log K) Sort?**
+We leverage the fact that the DLL is *already sorted* by popularity, so we just traverse and collect.
 
 ---
 
 ### Follow-up 3: Thread Safety
 
 **Problem:**
-> "Make the tracker thread-safe for concurrent web requests."
+> "Make the tracker thread-safe for concurrent web requests in a production environment."
 
-**Solution:**
-Since operations are O(1), critical sections are very short. A **Coarse-Grained Lock** (one lock for the whole structure) is efficient and simple.
+**Challenge:**
+Multiple threads could:
+1. Read/write the HashMap simultaneously
+2. Modify DLL pointers concurrently (causing corruption)
+3. Race on bucket operations (add/remove keys)
+
+**Solution: Coarse-Grained Locking**
+
+Since all operations are O(1) and very fast, using a single lock for the entire data structure is efficient and prevents deadlocks.
+
+**Implementation:**
+
+```python
+import threading
+from typing import Optional
+
+class ThreadSafeTracker(PopularityTracker):
+    """
+    Thread-safe version of PopularityTracker using coarse-grained locking.
+    Suitable for high-concurrency web applications.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.lock = threading.Lock()
+        # Alternative: threading.RLock() for reentrant locking
+
+    def increasePopularity(self, key: str) -> None:
+        """Thread-safe increase operation."""
+        with self.lock:
+            super().increasePopularity(key)
+
+    def decreasePopularity(self, key: str) -> None:
+        """Thread-safe decrease operation."""
+        with self.lock:
+            super().decreasePopularity(key)
+
+    def mostPopular(self) -> Optional[str]:
+        """Thread-safe query operation."""
+        with self.lock:
+            return super().mostPopular()
+
+    def getTopK(self, k: int) -> list:
+        """Thread-safe top-k query."""
+        with self.lock:
+            return super().getTopK(k)
+
+    def getCount(self, key: str) -> int:
+        """
+        Get current popularity count for a key.
+        Returns 0 if key doesn't exist.
+        """
+        with self.lock:
+            if key not in self.key_to_node:
+                return 0
+            return self.key_to_node[key].count
+```
+
+**Alternative: Fine-Grained Locking (Advanced)**
+
+For extremely high concurrency, we could use a Read-Write Lock:
 
 ```python
 import threading
 
-class ThreadSafeTracker(PopularityTracker):
+class RWLockTracker(PopularityTracker):
+    """
+    Read-Write Lock version for high read concurrency.
+    Multiple readers can query simultaneously.
+    Writers get exclusive access.
+    """
+
     def __init__(self):
         super().__init__()
-        self.lock = threading.Lock()
-        
-    def increasePopularity(self, key):
-        with self.lock:
+        from threading import Lock, Condition
+
+        self.read_ready = Condition(Lock())
+        self.readers = 0
+
+    def increasePopularity(self, key: str) -> None:
+        # Acquire write lock (exclusive)
+        with self.read_ready:
+            while self.readers > 0:
+                self.read_ready.wait()
             super().increasePopularity(key)
-            
-    def mostPopular(self):
-        with self.lock:
+
+    def mostPopular(self) -> Optional[str]:
+        # Acquire read lock (shared)
+        with self.read_ready:
+            self.readers += 1
+
+        try:
             return super().mostPopular()
+        finally:
+            with self.read_ready:
+                self.readers -= 1
+                if self.readers == 0:
+                    self.read_ready.notify_all()
 ```
+
+**Complexity Analysis:**
+
+**Coarse-Grained Locking:**
+- **Time Complexity:** O(1) + lock acquisition overhead
+  - Lock acquisition: O(1) amortized (assuming low contention)
+  - Under high contention: threads block, but operations remain O(1) once lock is acquired
+- **Space Complexity:** O(N) + O(T) where T = thread overhead (minimal)
+- **Throughput:** Serialized access (one operation at a time)
+
+**Read-Write Locking:**
+- **Time Complexity:**
+  - Reads: O(1) + shared lock overhead (concurrent)
+  - Writes: O(1) + exclusive lock overhead (serialized)
+- **Throughput:** Better for read-heavy workloads (multiple `mostPopular()` queries)
+
+**Comparison Table:**
+
+| Approach | Reads | Writes | Complexity | Best For |
+|----------|-------|--------|------------|----------|
+| **No Lock** | Fast | Fast | Simple | Single-threaded |
+| **Coarse Lock** | Serialized | Serialized | Simple | Balanced workload |
+| **RW Lock** | Concurrent | Serialized | Complex | Read-heavy (90%+ reads) |
+
+**Best Practice:**
+- **Start with coarse-grained locking** (simpler, fewer bugs)
+- **Profile in production** to identify bottlenecks
+- **Upgrade to RW locks** only if lock contention is proven to be a bottleneck
+
+**Deadlock Prevention:**
+Our implementation is deadlock-free because:
+1. Single lock (no lock ordering issues)
+2. No nested locking
+3. Locks are always released (context manager `with`)
+
+---
 
 ---
 
