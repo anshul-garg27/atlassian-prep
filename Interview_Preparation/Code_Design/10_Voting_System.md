@@ -2,7 +2,7 @@
 
 ### ⭐⭐⭐⭐ **Design Flexible Voting System with Strategy Pattern**
 
-**Frequency:** Appears in **MEDIUM FREQUENCY** of Atlassian LLD rounds!
+**Frequency:** MEDIUM at Atlassian
 **Difficulty:** Medium
 **Focus:** Strategy Pattern, Algorithm Design, Tie-Breaking
 
@@ -13,14 +13,37 @@
 Design a voting/election system that can handle different voting strategies:
 - **Simple Majority**: Candidate with most votes wins
 - **Weighted/Ranked Choice**: 1st choice = 3pts, 2nd = 2pts, 3rd = 1pt
-- **Instant Runoff**: Eliminate lowest, redistribute votes
+- **Instant Runoff (IRV)**: Eliminate lowest, redistribute votes
 
 **Core Requirements:**
-- Support multiple voting algorithms
+- Support multiple voting algorithms (swappable)
 - Handle tie-breaking
-- Easy to add new voting strategies
+- Prevent double voting
 - Cast votes and determine winners
 - Support real-time vote counting
+
+---
+
+## 🎯 Interview Approach
+
+### Step 1: Clarify Requirements (2 min)
+```
+"Let me clarify:
+1. What voting methods should we support?
+2. How to handle ties?
+3. Should we prevent duplicate voting?
+4. Can voters change their vote?
+5. Do we need real-time results?"
+```
+
+### Step 2: Identify Design Pattern (1 min)
+```
+"This is a perfect use case for Strategy Pattern:
+- VotingStrategy interface defines the algorithm
+- Each voting method is a concrete strategy
+- ElectionManager uses strategy without knowing details
+- Easy to add new voting methods without changing existing code"
+```
 
 ---
 
@@ -31,423 +54,530 @@ Scenario: 5 voters, 3 candidates (Alice, Bob, Charlie)
 
 ==== Simple Majority ====
 Alice: ███ (3 votes)
-Bob: ██ (2 votes)
+Bob:   ██  (2 votes)
 Charlie: █ (1 vote)
-Winner: Alice
+Winner: Alice (3 > 2 > 1)
 
 ==== Ranked Choice (3-2-1 points) ====
-Voter 1: [Alice:1st, Bob:2nd, Charlie:3rd]
-Voter 2: [Bob:1st, Alice:2nd, Charlie:3rd]
-Voter 3: [Alice:1st, Charlie:2nd, Bob:3rd]
+Voter 1: [Alice:1st, Bob:2nd, Charlie:3rd] → A:3, B:2, C:1
+Voter 2: [Bob:1st, Alice:2nd, Charlie:3rd] → B:3, A:2, C:1
+Voter 3: [Alice:1st, Charlie:2nd, Bob:3rd] → A:3, C:2, B:1
 
-Points:
+Total Points:
 Alice: 3+2+3 = 8
 Bob: 2+3+1 = 6
 Charlie: 1+1+2 = 4
-Winner: Alice
+Winner: Alice (8 points)
 
 ==== Instant Runoff ====
 Round 1: Alice(2), Bob(2), Charlie(1)
-Eliminate Charlie, redistribute
-Round 2: Alice(2), Bob(3)
-Winner: Bob
+         Charlie eliminated (lowest)
+Round 2: Charlie's votes → Bob (2nd choice)
+         Alice(2), Bob(3)
+Winner: Bob (majority after elimination)
 ```
 
 ---
 
-## 💻 Implementation
+## 💻 Python Implementation
 
-```java
-import java.util.*;
-import java.util.stream.Collectors;
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import List, Dict, Set, Optional
+from collections import defaultdict
+from enum import Enum
+import heapq
+from datetime import datetime
 
-// ============ Strategy Pattern Interface ============
-interface VotingStrategy {
-    String determineWinner(List<Ballot> ballots, List<String> candidates);
-}
+# ============ Data Classes ============
 
-// ============ Ballot Class ============
-class Ballot {
-    private String voterId;
-    private List<String> rankedChoices; // Ordered by preference
+@dataclass
+class Candidate:
+    """Represents a candidate in the election"""
+    id: str
+    name: str
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if isinstance(other, Candidate):
+            return self.id == other.id
+        return self.id == str(other)
 
-    public Ballot(String voterId, List<String> rankedChoices) {
-        this.voterId = voterId;
-        this.rankedChoices = new ArrayList<>(rankedChoices);
-    }
+@dataclass
+class Ballot:
+    """
+    Represents a voter's ballot.
+    
+    ranked_choices: List of candidate IDs in order of preference
+    (first = most preferred)
+    """
+    voter_id: str
+    ranked_choices: List[str]
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    @property
+    def first_choice(self) -> Optional[str]:
+        """Get the top choice"""
+        return self.ranked_choices[0] if self.ranked_choices else None
+    
+    def get_choice(self, rank: int) -> Optional[str]:
+        """Get choice at specific rank (0-indexed)"""
+        if 0 <= rank < len(self.ranked_choices):
+            return self.ranked_choices[rank]
+        return None
 
-    public String getVoterId() {
-        return voterId;
-    }
+# ============ Strategy Pattern Interface ============
 
-    public List<String> getRankedChoices() {
-        return new ArrayList<>(rankedChoices);
-    }
+class VotingStrategy(ABC):
+    """
+    Abstract base class for voting strategies.
+    
+    Design Pattern: Strategy
+    - Encapsulates different voting algorithms
+    - Allows runtime swapping of algorithms
+    - Open/Closed Principle: Add new strategies without modifying existing code
+    """
+    
+    @abstractmethod
+    def determine_winner(self, ballots: List[Ballot], 
+                        candidates: List[str]) -> Optional[str]:
+        """
+        Determine the winner based on the voting algorithm.
+        
+        Args:
+            ballots: List of all cast ballots
+            candidates: List of candidate IDs
+            
+        Returns:
+            Winner's candidate ID, or None if no winner
+        """
+        pass
+    
+    @abstractmethod
+    def get_results(self, ballots: List[Ballot], 
+                   candidates: List[str]) -> Dict[str, int]:
+        """Get detailed results (scores/votes per candidate)"""
+        pass
 
-    public String getFirstChoice() {
-        return rankedChoices.isEmpty() ? null : rankedChoices.get(0);
-    }
+# ============ Strategy 1: Simple Majority ============
 
-    public String getChoice(int rank) {
-        return (rank >= 0 && rank < rankedChoices.size()) 
-               ? rankedChoices.get(rank) 
-               : null;
-    }
-}
+class SimpleMajorityStrategy(VotingStrategy):
+    """
+    Simple plurality voting - candidate with most first-choice votes wins.
+    
+    Time: O(N) where N = number of ballots
+    Space: O(C) where C = number of candidates
+    """
+    
+    def determine_winner(self, ballots: List[Ballot], 
+                        candidates: List[str]) -> Optional[str]:
+        results = self.get_results(ballots, candidates)
+        
+        if not results:
+            return None
+        
+        # Find max votes
+        max_votes = max(results.values())
+        winners = [c for c, v in results.items() if v == max_votes]
+        
+        # Handle tie - return first alphabetically (or could use tie-breaker)
+        return min(winners) if winners else None
+    
+    def get_results(self, ballots: List[Ballot], 
+                   candidates: List[str]) -> Dict[str, int]:
+        vote_count = {c: 0 for c in candidates}
+        
+        for ballot in ballots:
+            choice = ballot.first_choice
+            if choice and choice in vote_count:
+                vote_count[choice] += 1
+        
+        return vote_count
 
-// ============ Strategy 1: Simple Majority ============
-class SimpleMajorityStrategy implements VotingStrategy {
-    @Override
-    public String determineWinner(List<Ballot> ballots, List<String> candidates) {
-        Map<String, Integer> voteCount = new HashMap<>();
+# ============ Strategy 2: Weighted Ranked Choice ============
 
-        // Initialize candidates
-        for (String candidate : candidates) {
-            voteCount.put(candidate, 0);
+class WeightedRankedChoiceStrategy(VotingStrategy):
+    """
+    Ranked choice with point values.
+    Default: 1st=3pts, 2nd=2pts, 3rd=1pt (Borda count variant)
+    
+    Time: O(N × R) where N = ballots, R = ranks considered
+    Space: O(C)
+    """
+    
+    def __init__(self, weights: List[int] = None):
+        # Default weights: [3, 2, 1] for top 3 choices
+        self.weights = weights or [3, 2, 1]
+    
+    def determine_winner(self, ballots: List[Ballot], 
+                        candidates: List[str]) -> Optional[str]:
+        results = self.get_results(ballots, candidates)
+        
+        if not results:
+            return None
+        
+        max_points = max(results.values())
+        winners = [c for c, p in results.items() if p == max_points]
+        
+        return min(winners) if winners else None
+    
+    def get_results(self, ballots: List[Ballot], 
+                   candidates: List[str]) -> Dict[str, int]:
+        points = {c: 0 for c in candidates}
+        
+        for ballot in ballots:
+            for rank, candidate_id in enumerate(ballot.ranked_choices):
+                if rank >= len(self.weights):
+                    break
+                
+                if candidate_id in points:
+                    points[candidate_id] += self.weights[rank]
+        
+        return points
+
+# ============ Strategy 3: Instant Runoff Voting ============
+
+class InstantRunoffStrategy(VotingStrategy):
+    """
+    Instant Runoff Voting (IRV) / Ranked Choice Voting.
+    
+    Algorithm:
+    1. Count first-choice votes
+    2. If someone has majority (>50%), they win
+    3. Otherwise, eliminate candidate with fewest votes
+    4. Redistribute eliminated candidate's votes to next choice
+    5. Repeat until someone has majority
+    
+    Time: O(C × N) where C = candidates, N = ballots
+    Space: O(C + N)
+    """
+    
+    def determine_winner(self, ballots: List[Ballot], 
+                        candidates: List[str]) -> Optional[str]:
+        remaining = set(candidates)
+        active_ballots = list(ballots)
+        
+        while len(remaining) > 1:
+            # Count first-choice votes among remaining candidates
+            vote_count = self._count_votes(active_ballots, remaining)
+            total_votes = sum(vote_count.values())
+            
+            if total_votes == 0:
+                return None
+            
+            # Check for majority
+            for candidate, votes in vote_count.items():
+                if votes > total_votes / 2:
+                    return candidate
+            
+            # Find and eliminate candidate with fewest votes
+            min_votes = min(vote_count.values())
+            losers = [c for c, v in vote_count.items() if v == min_votes]
+            
+            # Tie-breaker: eliminate alphabetically first
+            loser = min(losers)
+            remaining.remove(loser)
+        
+        return remaining.pop() if remaining else None
+    
+    def _count_votes(self, ballots: List[Ballot], 
+                    remaining: Set[str]) -> Dict[str, int]:
+        """Count first valid choice for each ballot"""
+        vote_count = {c: 0 for c in remaining}
+        
+        for ballot in ballots:
+            choice = self._get_first_remaining_choice(ballot, remaining)
+            if choice:
+                vote_count[choice] += 1
+        
+        return vote_count
+    
+    def _get_first_remaining_choice(self, ballot: Ballot, 
+                                   remaining: Set[str]) -> Optional[str]:
+        """Get voter's top choice among remaining candidates"""
+        for choice in ballot.ranked_choices:
+            if choice in remaining:
+                return choice
+        return None
+    
+    def get_results(self, ballots: List[Ballot], 
+                   candidates: List[str]) -> Dict[str, int]:
+        """Return first-round results"""
+        return self._count_votes(ballots, set(candidates))
+
+# ============ Tie-Breaker Strategies ============
+
+class TieBreaker(ABC):
+    """Abstract tie-breaking strategy"""
+    
+    @abstractmethod
+    def break_tie(self, tied_candidates: List[str]) -> str:
+        pass
+
+class AlphabeticalTieBreaker(TieBreaker):
+    """Break ties alphabetically (deterministic)"""
+    
+    def break_tie(self, tied_candidates: List[str]) -> str:
+        return min(tied_candidates)
+
+class RandomTieBreaker(TieBreaker):
+    """Break ties randomly"""
+    
+    def break_tie(self, tied_candidates: List[str]) -> str:
+        import random
+        return random.choice(tied_candidates)
+
+class FirstVoteTieBreaker(TieBreaker):
+    """Candidate who received first vote wins tie"""
+    
+    def __init__(self, ballots: List[Ballot]):
+        self.vote_order = {}
+        for i, ballot in enumerate(ballots):
+            if ballot.first_choice not in self.vote_order:
+                self.vote_order[ballot.first_choice] = i
+    
+    def break_tie(self, tied_candidates: List[str]) -> str:
+        return min(tied_candidates, 
+                  key=lambda c: self.vote_order.get(c, float('inf')))
+
+# ============ Election Manager ============
+
+class ElectionManager:
+    """
+    Manages an election with configurable voting strategy.
+    
+    Responsibilities:
+    - Validate and store ballots
+    - Prevent duplicate voting
+    - Delegate winner determination to strategy
+    - Support strategy switching
+    """
+    
+    def __init__(self, election_id: str, candidates: List[str],
+                 strategy: VotingStrategy,
+                 tie_breaker: TieBreaker = None):
+        self.election_id = election_id
+        self.candidates = list(candidates)
+        self.strategy = strategy
+        self.tie_breaker = tie_breaker or AlphabeticalTieBreaker()
+        
+        self._ballots: List[Ballot] = []
+        self._voter_ids: Set[str] = set()  # Prevent duplicate voting
+        self._is_closed = False
+    
+    def cast_vote(self, ballot: Ballot) -> bool:
+        """
+        Cast a vote.
+        
+        Returns: True if vote accepted, False if rejected
+        
+        Validation:
+        - Election not closed
+        - Voter hasn't already voted
+        - All choices are valid candidates
+        """
+        if self._is_closed:
+            return False
+        
+        if ballot.voter_id in self._voter_ids:
+            return False  # Duplicate vote
+        
+        # Validate candidates
+        for choice in ballot.ranked_choices:
+            if choice not in self.candidates:
+                raise ValueError(f"Invalid candidate: {choice}")
+        
+        self._ballots.append(ballot)
+        self._voter_ids.add(ballot.voter_id)
+        return True
+    
+    def get_winner(self) -> Optional[str]:
+        """Determine the winner using current strategy"""
+        if not self._ballots:
+            return None
+        
+        return self.strategy.determine_winner(self._ballots, self.candidates)
+    
+    def get_results(self) -> Dict[str, int]:
+        """Get current results"""
+        return self.strategy.get_results(self._ballots, self.candidates)
+    
+    def change_strategy(self, new_strategy: VotingStrategy) -> None:
+        """
+        Change voting strategy.
+        
+        Useful for comparing results under different methods.
+        """
+        self.strategy = new_strategy
+    
+    def close_election(self) -> None:
+        """Close election to new votes"""
+        self._is_closed = True
+    
+    def get_statistics(self) -> Dict:
+        """Get election statistics"""
+        return {
+            "election_id": self.election_id,
+            "total_votes": len(self._ballots),
+            "candidates": len(self.candidates),
+            "is_closed": self._is_closed,
+            "strategy": type(self.strategy).__name__,
         }
 
-        // Count votes (only first choice matters)
-        for (Ballot ballot : ballots) {
-            String choice = ballot.getFirstChoice();
-            if (choice != null && voteCount.containsKey(choice)) {
-                voteCount.put(choice, voteCount.get(choice) + 1);
-            }
-        }
+# ============ Election Factory ============
 
-        // Find winner
-        return voteCount.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
-    }
-}
+class ElectionFactory:
+    """Factory for creating elections with common configurations"""
+    
+    @staticmethod
+    def create_simple_majority(election_id: str, 
+                               candidates: List[str]) -> ElectionManager:
+        return ElectionManager(
+            election_id=election_id,
+            candidates=candidates,
+            strategy=SimpleMajorityStrategy()
+        )
+    
+    @staticmethod
+    def create_ranked_choice(election_id: str, candidates: List[str],
+                            weights: List[int] = None) -> ElectionManager:
+        return ElectionManager(
+            election_id=election_id,
+            candidates=candidates,
+            strategy=WeightedRankedChoiceStrategy(weights)
+        )
+    
+    @staticmethod
+    def create_instant_runoff(election_id: str, 
+                              candidates: List[str]) -> ElectionManager:
+        return ElectionManager(
+            election_id=election_id,
+            candidates=candidates,
+            strategy=InstantRunoffStrategy()
+        )
 
-// ============ Strategy 2: Weighted Ranked Choice ============
-class WeightedRankedChoiceStrategy implements VotingStrategy {
-    private int[] weights; // e.g., [3, 2, 1] for 1st, 2nd, 3rd
+# ============ Demo ============
 
-    public WeightedRankedChoiceStrategy(int[] weights) {
-        this.weights = weights;
-    }
+def main():
+    candidates = ["Alice", "Bob", "Charlie"]
+    
+    # ===== Test 1: Simple Majority =====
+    print("=" * 50)
+    print("TEST 1: Simple Majority")
+    print("=" * 50)
+    
+    election1 = ElectionFactory.create_simple_majority("E1", candidates)
+    
+    # Cast votes
+    election1.cast_vote(Ballot("V1", ["Alice"]))
+    election1.cast_vote(Ballot("V2", ["Bob"]))
+    election1.cast_vote(Ballot("V3", ["Alice"]))
+    election1.cast_vote(Ballot("V4", ["Charlie"]))
+    election1.cast_vote(Ballot("V5", ["Alice"]))
+    
+    print(f"Results: {election1.get_results()}")
+    print(f"Winner: {election1.get_winner()}")
+    
+    # Try duplicate vote
+    result = election1.cast_vote(Ballot("V1", ["Bob"]))
+    print(f"Duplicate vote accepted: {result}")  # Should be False
+    
+    # ===== Test 2: Weighted Ranked Choice =====
+    print("\n" + "=" * 50)
+    print("TEST 2: Weighted Ranked Choice (3-2-1)")
+    print("=" * 50)
+    
+    election2 = ElectionFactory.create_ranked_choice("E2", candidates)
+    
+    election2.cast_vote(Ballot("V1", ["Alice", "Bob", "Charlie"]))
+    election2.cast_vote(Ballot("V2", ["Bob", "Alice", "Charlie"]))
+    election2.cast_vote(Ballot("V3", ["Alice", "Charlie", "Bob"]))
+    
+    print(f"Points: {election2.get_results()}")
+    print(f"Winner: {election2.get_winner()}")
+    
+    # ===== Test 3: Instant Runoff =====
+    print("\n" + "=" * 50)
+    print("TEST 3: Instant Runoff Voting")
+    print("=" * 50)
+    
+    election3 = ElectionFactory.create_instant_runoff("E3", candidates)
+    
+    # Scenario where Alice leads initially but loses after redistribution
+    election3.cast_vote(Ballot("V1", ["Alice", "Bob", "Charlie"]))
+    election3.cast_vote(Ballot("V2", ["Alice", "Bob", "Charlie"]))
+    election3.cast_vote(Ballot("V3", ["Bob", "Charlie", "Alice"]))
+    election3.cast_vote(Ballot("V4", ["Bob", "Charlie", "Alice"]))
+    election3.cast_vote(Ballot("V5", ["Charlie", "Bob", "Alice"]))  # Charlie eliminated, vote goes to Bob
+    
+    print(f"First-round: {election3.get_results()}")
+    print(f"Winner after runoff: {election3.get_winner()}")
+    
+    # ===== Test 4: Strategy Switching =====
+    print("\n" + "=" * 50)
+    print("TEST 4: Same Votes, Different Strategies")
+    print("=" * 50)
+    
+    election4 = ElectionManager("E4", candidates, SimpleMajorityStrategy())
+    
+    # Add votes
+    for ballot in [
+        Ballot("V1", ["Alice", "Bob", "Charlie"]),
+        Ballot("V2", ["Bob", "Alice", "Charlie"]),
+        Ballot("V3", ["Charlie", "Bob", "Alice"]),
+    ]:
+        election4.cast_vote(ballot)
+    
+    print(f"Simple Majority: {election4.get_winner()}")
+    
+    election4.change_strategy(WeightedRankedChoiceStrategy([3, 2, 1]))
+    print(f"Ranked Choice: {election4.get_winner()}")
+    
+    election4.change_strategy(InstantRunoffStrategy())
+    print(f"Instant Runoff: {election4.get_winner()}")
+    
+    print("\n" + "=" * 50)
+    print("Statistics:", election4.get_statistics())
 
-    @Override
-    public String determineWinner(List<Ballot> ballots, List<String> candidates) {
-        Map<String, Integer> points = new HashMap<>();
-
-        // Initialize candidates
-        for (String candidate : candidates) {
-            points.put(candidate, 0);
-        }
-
-        // Calculate weighted points
-        for (Ballot ballot : ballots) {
-            List<String> choices = ballot.getRankedChoices();
-
-            for (int i = 0; i < Math.min(choices.size(), weights.length); i++) {
-                String candidate = choices.get(i);
-                if (points.containsKey(candidate)) {
-                    points.put(candidate, points.get(candidate) + weights[i]);
-                }
-            }
-        }
-
-        // Find winner with most points
-        return points.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
-    }
-}
-
-// ============ Strategy 3: Instant Runoff (IRV) ============
-class InstantRunoffStrategy implements VotingStrategy {
-    @Override
-    public String determineWinner(List<Ballot> ballots, List<String> candidates) {
-        Set<String> remainingCandidates = new HashSet<>(candidates);
-        List<Ballot> activeBallots = new ArrayList<>(ballots);
-
-        while (remainingCandidates.size() > 1) {
-            // Count first-choice votes
-            Map<String, Integer> voteCount = new HashMap<>();
-            for (String candidate : remainingCandidates) {
-                voteCount.put(candidate, 0);
-            }
-
-            for (Ballot ballot : activeBallots) {
-                String firstChoice = getFirstRemainingChoice(
-                        ballot, remainingCandidates);
-                if (firstChoice != null) {
-                    voteCount.put(firstChoice, voteCount.get(firstChoice) + 1);
-                }
-            }
-
-            // Check if anyone has majority
-            int totalVotes = voteCount.values().stream()
-                    .mapToInt(Integer::intValue).sum();
-
-            for (Map.Entry<String, Integer> entry : voteCount.entrySet()) {
-                if (entry.getValue() > totalVotes / 2) {
-                    return entry.getKey(); // Majority winner
-                }
-            }
-
-            // Eliminate candidate with fewest votes
-            String loser = voteCount.entrySet().stream()
-                    .min(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-
-            if (loser != null) {
-                remainingCandidates.remove(loser);
-            }
-        }
-
-        return remainingCandidates.iterator().next();
-    }
-
-    private String getFirstRemainingChoice(Ballot ballot, 
-                                          Set<String> remaining) {
-        for (String choice : ballot.getRankedChoices()) {
-            if (remaining.contains(choice)) {
-                return choice;
-            }
-        }
-        return null;
-    }
-}
-
-// ============ Tie-Breaking Strategy ============
-interface TieBreaker {
-    String breakTie(List<String> tiedCandidates);
-}
-
-class AlphabeticalTieBreaker implements TieBreaker {
-    @Override
-    public String breakTie(List<String> tiedCandidates) {
-        return tiedCandidates.stream()
-                .sorted()
-                .findFirst()
-                .orElse(null);
-    }
-}
-
-class RandomTieBreaker implements TieBreaker {
-    private Random random = new Random();
-
-    @Override
-    public String breakTie(List<String> tiedCandidates) {
-        int index = random.nextInt(tiedCandidates.size());
-        return tiedCandidates.get(index);
-    }
-}
-
-// ============ Election Manager ============
-class ElectionManager {
-    private String electionId;
-    private List<String> candidates;
-    private List<Ballot> ballots;
-    private VotingStrategy strategy;
-    private TieBreaker tieBreaker;
-    private Set<String> votedUserIds; // Prevent double voting
-
-    public ElectionManager(String electionId, List<String> candidates,
-                          VotingStrategy strategy, TieBreaker tieBreaker) {
-        this.electionId = electionId;
-        this.candidates = new ArrayList<>(candidates);
-        this.ballots = new ArrayList<>();
-        this.strategy = strategy;
-        this.tieBreaker = tieBreaker;
-        this.votedUserIds = new HashSet<>();
-    }
-
-    public boolean castVote(Ballot ballot) {
-        // Prevent double voting
-        if (votedUserIds.contains(ballot.getVoterId())) {
-            return false;
-        }
-
-        // Validate candidates
-        for (String choice : ballot.getRankedChoices()) {
-            if (!candidates.contains(choice)) {
-                throw new IllegalArgumentException(
-                        "Invalid candidate: " + choice);
-            }
-        }
-
-        ballots.add(ballot);
-        votedUserIds.add(ballot.getVoterId());
-        return true;
-    }
-
-    public String getWinner() {
-        if (ballots.isEmpty()) {
-            return null;
-        }
-
-        return strategy.determineWinner(ballots, candidates);
-    }
-
-    public Map<String, Integer> getResults() {
-        Map<String, Integer> results = new HashMap<>();
-
-        for (String candidate : candidates) {
-            results.put(candidate, 0);
-        }
-
-        for (Ballot ballot : ballots) {
-            String choice = ballot.getFirstChoice();
-            if (choice != null && results.containsKey(choice)) {
-                results.put(choice, results.get(choice) + 1);
-            }
-        }
-
-        return results;
-    }
-
-    public void changeStrategy(VotingStrategy newStrategy) {
-        this.strategy = newStrategy;
-    }
-}
-
-// ============ Demo ============
-public class Main {
-    public static void main(String[] args) {
-        List<String> candidates = Arrays.asList("Alice", "Bob", "Charlie");
-
-        // Test 1: Simple Majority
-        System.out.println("=== Simple Majority ===");
-        ElectionManager election1 = new ElectionManager(
-                "ELECTION_1",
-                candidates,
-                new SimpleMajorityStrategy(),
-                new AlphabeticalTieBreaker()
-        );
-
-        election1.castVote(new Ballot("V1", Arrays.asList("Alice")));
-        election1.castVote(new Ballot("V2", Arrays.asList("Bob")));
-        election1.castVote(new Ballot("V3", Arrays.asList("Alice")));
-        election1.castVote(new Ballot("V4", Arrays.asList("Charlie")));
-        election1.castVote(new Ballot("V5", Arrays.asList("Alice")));
-
-        System.out.println("Winner: " + election1.getWinner());
-        System.out.println("Results: " + election1.getResults());
-
-        // Test 2: Weighted Ranked Choice
-        System.out.println("\n=== Weighted Ranked Choice (3-2-1) ===");
-        ElectionManager election2 = new ElectionManager(
-                "ELECTION_2",
-                candidates,
-                new WeightedRankedChoiceStrategy(new int[]{3, 2, 1}),
-                new AlphabeticalTieBreaker()
-        );
-
-        election2.castVote(new Ballot("V1", 
-                Arrays.asList("Alice", "Bob", "Charlie")));
-        election2.castVote(new Ballot("V2", 
-                Arrays.asList("Bob", "Alice", "Charlie")));
-        election2.castVote(new Ballot("V3", 
-                Arrays.asList("Alice", "Charlie", "Bob")));
-
-        System.out.println("Winner: " + election2.getWinner());
-
-        // Test 3: Instant Runoff
-        System.out.println("\n=== Instant Runoff ===");
-        ElectionManager election3 = new ElectionManager(
-                "ELECTION_3",
-                candidates,
-                new InstantRunoffStrategy(),
-                new AlphabeticalTieBreaker()
-        );
-
-        election3.castVote(new Ballot("V1", 
-                Arrays.asList("Alice", "Bob", "Charlie")));
-        election3.castVote(new Ballot("V2", 
-                Arrays.asList("Bob", "Alice", "Charlie")));
-        election3.castVote(new Ballot("V3", 
-                Arrays.asList("Charlie", "Bob", "Alice")));
-        election3.castVote(new Ballot("V4", 
-                Arrays.asList("Alice", "Bob", "Charlie")));
-        election3.castVote(new Ballot("V5", 
-                Arrays.asList("Bob", "Charlie", "Alice")));
-
-        System.out.println("Winner: " + election3.getWinner());
-    }
-}
+if __name__ == "__main__":
+    main()
 ```
 
 ---
 
-## 🧪 Testing Strategy
+## 🎯 Interview Explanation Flow
 
-```java
-@Test
-public void testSimpleMajority() {
-    VotingStrategy strategy = new SimpleMajorityStrategy();
-    List<String> candidates = Arrays.asList("A", "B", "C");
-
-    List<Ballot> ballots = Arrays.asList(
-            new Ballot("V1", Arrays.asList("A")),
-            new Ballot("V2", Arrays.asList("B")),
-            new Ballot("V3", Arrays.asList("A")),
-            new Ballot("V4", Arrays.asList("C")),
-            new Ballot("V5", Arrays.asList("A"))
-    );
-
-    String winner = strategy.determineWinner(ballots, candidates);
-    assertEquals("A", winner);
-}
-
-@Test
-public void testTieBreaking() {
-    VotingStrategy strategy = new SimpleMajorityStrategy();
-    List<String> candidates = Arrays.asList("A", "B");
-
-    List<Ballot> ballots = Arrays.asList(
-            new Ballot("V1", Arrays.asList("A")),
-            new Ballot("V2", Arrays.asList("B"))
-    );
-
-    // Should handle tie scenario
-    String winner = strategy.determineWinner(ballots, candidates);
-    assertTrue(winner.equals("A") || winner.equals("B"));
-}
-
-@Test
-public void testPreventDoubleVoting() {
-    ElectionManager election = new ElectionManager(
-            "TEST", Arrays.asList("A", "B"),
-            new SimpleMajorityStrategy(),
-            new AlphabeticalTieBreaker()
-    );
-
-    assertTrue(election.castVote(new Ballot("V1", Arrays.asList("A"))));
-    assertFalse(election.castVote(new Ballot("V1", Arrays.asList("B")))); // Duplicate
-}
+### 1. Identify the Pattern (30 sec)
+```
+"This is a classic Strategy Pattern use case:
+- Multiple algorithms for the same problem (counting votes)
+- Need to swap algorithms at runtime
+- Each strategy encapsulates its own logic
+- Open/Closed Principle: add new strategies without changing manager"
 ```
 
----
+### 2. Key Design Decisions (1 min)
+```
+"Critical decisions:
+1. Ballot stores ranked choices (supports all strategies)
+2. Strategy interface with determine_winner and get_results
+3. ElectionManager handles validation, strategy delegates counting
+4. Separate TieBreaker strategy for flexibility
+5. Factory methods for common configurations"
+```
 
-## 💡 Interview Discussion Points
-
-**Critical Question to Ask:** "What happens in case of a tie?"
-- Alphabetical order?
-- Random selection?
-- Re-vote?
-- Most recent vote wins?
-
-**What Interviewers Look For:**
-✅ **Strategy Pattern** for pluggable algorithms
-✅ **Tie-breaking logic**
-✅ **Prevent double voting**
-✅ **Input validation**
-✅ **Support for changing strategy**
-
-**Common Mistakes (STRONG NO HIRE):**
-❌ Using `LinkedHashMap` thinking it sorts (it maintains insertion order!)
-❌ No tie-breaking discussion
-❌ Not validating candidate names
-❌ Allowing duplicate votes
-❌ Inefficient O(N²) sorting when heap would work
+### 3. Important Question (30 sec)
+```
+"ALWAYS ASK: How should we handle ties?
+- Alphabetical order (deterministic)
+- Random selection
+- Re-vote
+- First to receive vote
+- Custom tie-breaker strategy"
+```
 
 ---
 
@@ -456,20 +586,84 @@ public void testPreventDoubleVoting() {
 | Strategy | Time | Space |
 |----------|------|-------|
 | Simple Majority | O(N) | O(C) |
-| Weighted Ranked | O(N×R) | O(C) |
-| Instant Runoff | O(C×N) | O(C) |
+| Weighted Ranked | O(N × R) | O(C) |
+| Instant Runoff | O(C × N) | O(C + N) |
 
-**Where:** N = ballots, C = candidates, R = ranked choices per ballot
+**Where:** N = ballots, C = candidates, R = ranks per ballot
 
 ---
 
-## 💯 Best Practices
+## 💡 Interview Tips
 
-✅ **Strategy Pattern** for flexibility
-✅ **Separate tie-breaking** logic
-✅ **Prevent double voting** with Set
-✅ **Validate inputs** (candidates, ballot format)
-✅ **Use PriorityQueue** for top K (not full sort)
-✅ **Ask about tie-breaking** before implementing!
+### What Interviewers Look For:
+✅ **Strategy Pattern** implementation
+✅ **Tie-breaking** discussion
+✅ **Duplicate vote prevention**
+✅ **Input validation**
+✅ **Clean separation** of concerns
 
-**Interview Pro Tip:** This problem tests if you understand **Strategy Pattern** and can discuss trade-offs between voting algorithms!
+### Common Mistakes (STRONG NO HIRE):
+❌ Using `LinkedHashMap` thinking it sorts (it maintains insertion order!)
+❌ No tie-breaking discussion or handling
+❌ Not validating candidate names
+❌ Allowing duplicate votes
+❌ Hardcoding specific algorithm instead of using strategy
+
+### Questions to Ask:
+- "How should ties be handled?"
+- "Can voters change their vote?"
+- "Do we need real-time results?"
+- "Should we support ranked ballots?"
+- "What's the expected scale (voters/candidates)?"
+
+---
+
+## 🚀 Extensions
+
+### 1. Real-time Results with Observer Pattern
+```python
+class ObservableElection(ElectionManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._observers = []
+    
+    def add_observer(self, callback):
+        self._observers.append(callback)
+    
+    def cast_vote(self, ballot: Ballot) -> bool:
+        result = super().cast_vote(ballot)
+        if result:
+            for observer in self._observers:
+                observer(self.get_results())
+        return result
+```
+
+### 2. Vote History and Audit
+```python
+@dataclass
+class VoteAuditEntry:
+    timestamp: datetime
+    voter_id_hash: str  # Hashed for privacy
+    ballot_hash: str
+    action: str  # "cast", "modified", "invalidated"
+```
+
+### 3. Distributed Voting
+```python
+class DistributedElection:
+    """Voting across multiple regions with eventual consistency"""
+    
+    def merge_results(self, region_results: List[Dict]) -> Dict:
+        # Merge votes from different regions
+        pass
+```
+
+---
+
+## 🔗 Related Concepts
+
+- **Strategy Pattern**: Core pattern for swappable algorithms
+- **Factory Pattern**: Creating elections with preset configurations
+- **Observer Pattern**: Real-time result updates
+- **Consensus Algorithms**: Distributed voting systems
+

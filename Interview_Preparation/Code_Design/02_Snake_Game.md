@@ -20,13 +20,26 @@ Design and implement the classic Snake Game with clean, modular, and extensible 
 - Track game state (score, game over)
 
 **Input:** Board size, initial snake position, food positions
-**Output:** Working game with move(), placeFood(), isGameOver() methods
+**Output:** Working game with `move()`, `place_food()`, `is_game_over()` methods
 
 **Constraints:**
 - 5 ≤ Board size ≤ 100
 - Snake initial length ≥ 1
 - Food appears randomly
 - Snake cannot reverse direction instantly (UP → DOWN not allowed)
+
+---
+
+## 🎤 How to Explain in Interview
+
+### **Opening Statement (30 seconds)**
+> "I'll design the Snake Game using clean OOP principles with Python's `dataclasses` for cleaner code. I'll use a `deque` for O(1) snake operations and a `set` for O(1) collision detection."
+
+### **Key Points to Mention:**
+1. "Using `deque` for O(1) head/tail operations instead of list"
+2. "Using `set` for O(1) collision detection instead of O(n) list search"
+3. "Using `Enum` for directions with built-in opposite checking"
+4. "Following **Single Responsibility Principle** - separate Snake, Board, Game classes"
 
 ---
 
@@ -40,10 +53,6 @@ Initial State (10×10 board):
 . . H B B . . . . .  B = Body
 . . . . . . . . . .
 . . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
 
 After move(UP):
 . . . . . . . . . .
@@ -51,13 +60,8 @@ After move(UP):
 . . H . . . . . . .  Snake moved up
 . . B B . . . . . .  Tail removed
 . . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
-. . . . . . . . . .
 
-After eating food and moving RIGHT:
+After eating food and moving:
 . . . . . . . . . .
 . . . . H . . . . .  Snake grew (no tail removal)
 . . . B B . . . . .
@@ -67,916 +71,677 @@ After eating food and moving RIGHT:
 
 ---
 
+## 🎯 Design Patterns Used
+
+### **1. Single Responsibility Principle (SRP)** ⭐
+Each class has ONE clear responsibility:
+- `Snake`: Manage body positions and movement
+- `Board`: Manage grid boundaries
+- `SnakeGame`: Orchestrate game logic
+
+### **2. Open/Closed Principle (OCP)** ⭐
+Easy to extend without modifying existing code:
+```python
+# Add obstacles without changing Snake/Board
+class SnakeGameWithObstacles(SnakeGame):
+    def __init__(self, ...):
+        super().__init__(...)
+        self.obstacles: Set[Position] = set()
+```
+
+### **3. Encapsulation** ⭐
+- Private state (body positions) not directly accessible
+- Public methods provide controlled access
+
+---
+
 ## 🏗️ Class Design
 
-### **Core Classes:**
-
 ```text
-┌─────────────┐
-│    Game     │  ← Main controller
-├─────────────┤
-│ - snake     │
-│ - board     │
-│ - food      │
-│ - score     │
-│ - gameOver  │
-└─────────────┘
-       │
-       ├──────────────┬──────────────┐
-       │              │              │
-  ┌─────────┐   ┌─────────┐   ┌─────────┐
-  │  Snake  │   │  Board  │   │  Food   │
-  └─────────┘   └─────────┘   └─────────┘
-       │
-  ┌─────────┐
-  │Position │  ← Helper class (x, y)
-  └─────────┘
-
-  ┌──────────┐
-  │Direction │  ← Enum (UP, DOWN, LEFT, RIGHT)
-  └──────────┘
+┌─────────────────┐
+│   SnakeGame     │  ← Main controller (orchestrates)
+├─────────────────┤
+│ - snake: Snake  │
+│ - board: Board  │
+│ - food: Position│
+│ - score: int    │
+│ - game_over: bool
+└─────────────────┘
+        │
+        ├──────────────┬──────────────┐
+        │              │              │
+   ┌─────────┐   ┌─────────┐   ┌───────────┐
+   │  Snake  │   │  Board  │   │ Direction │
+   ├─────────┤   ├─────────┤   ├───────────┤
+   │- body   │   │- rows   │   │ UP        │
+   │- occupied│  │- cols   │   │ DOWN      │
+   │- direction  └─────────┘   │ LEFT      │
+   └─────────┘                 │ RIGHT     │
+                               └───────────┘
 ```
 
 ---
 
-## 💻 Implementation
-
-### **Java Implementation (Complete)**
-
-```java
-import java.util.*;
-
-// ============ Position Class ============
-class Position {
-    int x, y;
-
-    public Position(int x, int y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Position)) return false;
-        Position pos = (Position) o;
-        return x == pos.x && y == pos.y;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(x, y);
-    }
-
-    @Override
-    public String toString() {
-        return "(" + x + "," + y + ")";
-    }
-}
-
-// ============ Direction Enum ============
-enum Direction {
-    UP(-1, 0),
-    DOWN(1, 0),
-    LEFT(0, -1),
-    RIGHT(0, 1);
-
-    final int dx, dy;
-
-    Direction(int dx, int dy) {
-        this.dx = dx;
-        this.dy = dy;
-    }
-
-    public boolean isOpposite(Direction other) {
-        return (this == UP && other == DOWN) ||
-               (this == DOWN && other == UP) ||
-               (this == LEFT && other == RIGHT) ||
-               (this == RIGHT && other == LEFT);
-    }
-}
-
-// ============ Snake Class ============
-class Snake {
-    private Deque<Position> body;
-    private Direction currentDirection;
-    private Set<Position> occupiedPositions; // For O(1) collision check
-
-    public Snake(Position initialPosition) {
-        this.body = new LinkedList<>();
-        this.body.addFirst(initialPosition);
-        this.occupiedPositions = new HashSet<>();
-        this.occupiedPositions.add(initialPosition);
-        this.currentDirection = Direction.RIGHT; // Default direction
-    }
-
-    public Position getHead() {
-        return body.peekFirst();
-    }
-
-    public Position getTail() {
-        return body.peekLast();
-    }
-
-    public Direction getCurrentDirection() {
-        return currentDirection;
-    }
-
-    public boolean changeDirection(Direction newDirection) {
-        // Cannot reverse instantly
-        if (currentDirection.isOpposite(newDirection)) {
-            return false;
-        }
-        this.currentDirection = newDirection;
-        return true;
-    }
-
-    public Position getNextHeadPosition() {
-        Position head = getHead();
-        return new Position(
-            head.x + currentDirection.dx,
-            head.y + currentDirection.dy
-        );
-    }
-
-    public void move(Position newHead) {
-        body.addFirst(newHead);
-        occupiedPositions.add(newHead);
-
-        // Remove tail (no growth)
-        Position tail = body.removeLast();
-        occupiedPositions.remove(tail);
-    }
-
-    public void grow(Position newHead) {
-        // Add head but don't remove tail
-        body.addFirst(newHead);
-        occupiedPositions.add(newHead);
-    }
-
-    public boolean isCollision(Position pos) {
-        return occupiedPositions.contains(pos);
-    }
-
-    public int getLength() {
-        return body.size();
-    }
-
-    public List<Position> getBody() {
-        return new ArrayList<>(body);
-    }
-}
-
-// ============ Board Class ============
-class Board {
-    private final int rows;
-    private final int cols;
-
-    public Board(int rows, int cols) {
-        if (rows <= 0 || cols <= 0) {
-            throw new IllegalArgumentException("Board dimensions must be positive");
-        }
-        this.rows = rows;
-        this.cols = cols;
-    }
-
-    public boolean isWithinBounds(Position pos) {
-        return pos.x >= 0 && pos.x < rows && pos.y >= 0 && pos.y < cols;
-    }
-
-    public int getRows() {
-        return rows;
-    }
-
-    public int getCols() {
-        return cols;
-    }
-
-    public Position getRandomPosition() {
-        Random rand = new Random();
-        return new Position(rand.nextInt(rows), rand.nextInt(cols));
-    }
-}
-
-// ============ Game Class ============
-class SnakeGame {
-    private Snake snake;
-    private Board board;
-    private Position food;
-    private int score;
-    private boolean gameOver;
-
-    public SnakeGame(int rows, int cols, Position initialSnakePos) {
-        this.board = new Board(rows, cols);
-        this.snake = new Snake(initialSnakePos);
-        this.score = 0;
-        this.gameOver = false;
-        this.food = placeFood();
-    }
-
-    public boolean move(Direction direction) {
-        if (gameOver) {
-            throw new IllegalStateException("Game is over!");
-        }
-
-        // Try to change direction
-        snake.changeDirection(direction);
-
-        // Calculate next head position
-        Position nextHead = snake.getNextHeadPosition();
-
-        // Check collision with walls
-        if (!board.isWithinBounds(nextHead)) {
-            gameOver = true;
-            return false;
-        }
-
-        // Check collision with self
-        if (snake.isCollision(nextHead)) {
-            gameOver = true;
-            return false;
-        }
-
-        // Check if eating food
-        if (nextHead.equals(food)) {
-            snake.grow(nextHead);
-            score += 10;
-            food = placeFood();
-        } else {
-            snake.move(nextHead);
-        }
-
-        return true;
-    }
-
-    private Position placeFood() {
-        Position newFood;
-        do {
-            newFood = board.getRandomPosition();
-        } while (snake.isCollision(newFood));
-        return newFood;
-    }
-
-    public boolean isGameOver() {
-        return gameOver;
-    }
-
-    public int getScore() {
-        return score;
-    }
-
-    public Position getFoodPosition() {
-        return food;
-    }
-
-    public List<Position> getSnakeBody() {
-        return snake.getBody();
-    }
-
-    public void printBoard() {
-        char[][] grid = new char[board.getRows()][board.getCols()];
-
-        // Fill with empty cells
-        for (int i = 0; i < board.getRows(); i++) {
-            Arrays.fill(grid[i], '.');
-        }
-
-        // Place snake body
-        List<Position> body = snake.getBody();
-        for (int i = 0; i < body.size(); i++) {
-            Position pos = body.get(i);
-            if (i == 0) {
-                grid[pos.x][pos.y] = 'H'; // Head
-            } else {
-                grid[pos.x][pos.y] = 'B'; // Body
-            }
-        }
-
-        // Place food
-        grid[food.x][food.y] = 'F';
-
-        // Print grid
-        for (char[] row : grid) {
-            for (char cell : row) {
-                System.out.print(cell + " ");
-            }
-            System.out.println();
-        }
-        System.out.println("Score: " + score);
-        System.out.println();
-    }
-}
-
-// ============ Main / Demo ============
-public class Main {
-    public static void main(String[] args) {
-        SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-
-        System.out.println("Initial State:");
-        game.printBoard();
-
-        // Simulate moves
-        game.move(Direction.UP);
-        System.out.println("After UP:");
-        game.printBoard();
-
-        game.move(Direction.RIGHT);
-        System.out.println("After RIGHT:");
-        game.printBoard();
-
-        game.move(Direction.RIGHT);
-        System.out.println("After RIGHT:");
-        game.printBoard();
-
-        System.out.println("Game Over: " + game.isGameOver());
-        System.out.println("Final Score: " + game.getScore());
-    }
-}
-```
-
----
-
-### **Python Implementation (Complete)**
+## 💻 Python Implementation (Production-Ready)
 
 ```python
+"""
+Snake Game - Low-Level Design Implementation
+============================================
+Clean OOP implementation using Python's modern features.
+
+Design Patterns:
+- Single Responsibility Principle (SRP)
+- Open/Closed Principle (OCP) - easy to extend
+- Encapsulation - controlled state access
+
+Data Structures:
+- deque: O(1) for head/tail operations
+- set: O(1) for collision detection
+
+Time Complexity: O(1) per move
+Space Complexity: O(snake_length + board_size)
+"""
+
 from collections import deque
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import List, Set, Tuple, Optional
 import random
 
-# ============ Direction Enum ============
+
+# Type alias for position (row, col)
+Position = Tuple[int, int]
+
+
 class Direction(Enum):
+    """
+    Movement directions with delta values.
+    
+    Using Enum prevents magic strings and provides type safety.
+    """
     UP = (-1, 0)
     DOWN = (1, 0)
     LEFT = (0, -1)
     RIGHT = (0, 1)
+    
+    def is_opposite(self, other: 'Direction') -> bool:
+        """Check if two directions are opposite (invalid move)."""
+        opposites = {
+            (Direction.UP, Direction.DOWN),
+            (Direction.DOWN, Direction.UP),
+            (Direction.LEFT, Direction.RIGHT),
+            (Direction.RIGHT, Direction.LEFT),
+        }
+        return (self, other) in opposites
+    
+    @property
+    def delta(self) -> Position:
+        """Get (row_delta, col_delta) for this direction."""
+        return self.value
 
-    def is_opposite(self, other):
-        return (self == Direction.UP and other == Direction.DOWN) or \
-               (self == Direction.DOWN and other == Direction.UP) or \
-               (self == Direction.LEFT and other == Direction.RIGHT) or \
-               (self == Direction.RIGHT and other == Direction.LEFT)
 
-# ============ Snake Class ============
+@dataclass
 class Snake:
-    def __init__(self, initial_pos):
-        self.body = deque([initial_pos])
-        self.occupied = {initial_pos}
-        self.direction = Direction.RIGHT
-
-    def get_head(self):
+    """
+    Snake entity managing body positions and movement.
+    
+    Key Design Decisions:
+    - Uses deque for O(1) head/tail operations
+    - Uses set for O(1) collision detection
+    - Prevents instant direction reversal
+    
+    Attributes:
+        body: Deque of positions (head at index 0)
+        occupied: Set of all body positions (for O(1) collision check)
+        direction: Current movement direction
+    """
+    initial_position: Position
+    body: deque = field(init=False)
+    occupied: Set[Position] = field(init=False)
+    direction: Direction = field(default=Direction.RIGHT)
+    
+    def __post_init__(self):
+        """Initialize body and occupied set."""
+        self.body = deque([self.initial_position])
+        self.occupied = {self.initial_position}
+    
+    @property
+    def head(self) -> Position:
+        """Get current head position."""
         return self.body[0]
-
-    def get_tail(self):
+    
+    @property
+    def tail(self) -> Position:
+        """Get current tail position."""
         return self.body[-1]
-
-    def change_direction(self, new_direction):
+    
+    @property
+    def length(self) -> int:
+        """Get current snake length."""
+        return len(self.body)
+    
+    def change_direction(self, new_direction: Direction) -> bool:
+        """
+        Change snake direction (validates not opposite).
+        
+        Args:
+            new_direction: Desired new direction
+            
+        Returns:
+            True if direction changed, False if invalid (opposite)
+        """
         if self.direction.is_opposite(new_direction):
             return False
         self.direction = new_direction
         return True
-
-    def get_next_head_pos(self):
-        head = self.get_head()
-        dx, dy = self.direction.value
-        return (head[0] + dx, head[1] + dy)
-
-    def move(self, new_head):
+    
+    def get_next_head_position(self) -> Position:
+        """Calculate where head will be after moving."""
+        row, col = self.head
+        d_row, d_col = self.direction.delta
+        return (row + d_row, col + d_col)
+    
+    def move(self, new_head: Position) -> None:
+        """
+        Move snake to new position (normal move, no growth).
+        
+        Args:
+            new_head: New head position
+        """
+        # Add new head
         self.body.appendleft(new_head)
         self.occupied.add(new_head)
-
+        
         # Remove tail
         tail = self.body.pop()
         self.occupied.remove(tail)
-
-    def grow(self, new_head):
+    
+    def grow(self, new_head: Position) -> None:
+        """
+        Grow snake by adding head without removing tail.
+        
+        Args:
+            new_head: New head position after eating food
+        """
         self.body.appendleft(new_head)
         self.occupied.add(new_head)
+    
+    def is_collision(self, position: Position) -> bool:
+        """
+        Check if position collides with snake body.
+        O(1) lookup using set.
+        
+        Args:
+            position: Position to check
+            
+        Returns:
+            True if position is occupied by snake
+        """
+        return position in self.occupied
+    
+    def get_body_positions(self) -> List[Position]:
+        """Get list of all body positions (for rendering)."""
+        return list(self.body)
 
-    def is_collision(self, pos):
-        return pos in self.occupied
 
-    def get_length(self):
-        return len(self.body)
-
-# ============ Board Class ============
+@dataclass
 class Board:
-    def __init__(self, rows, cols):
-        self.rows = rows
-        self.cols = cols
+    """
+    Game board managing grid boundaries.
+    
+    Attributes:
+        rows: Number of rows
+        cols: Number of columns
+    """
+    rows: int
+    cols: int
+    
+    def __post_init__(self):
+        """Validate board dimensions."""
+        if self.rows <= 0 or self.cols <= 0:
+            raise ValueError("Board dimensions must be positive")
+    
+    def is_within_bounds(self, position: Position) -> bool:
+        """
+        Check if position is within board boundaries.
+        
+        Args:
+            position: (row, col) tuple
+            
+        Returns:
+            True if position is valid
+        """
+        row, col = position
+        return 0 <= row < self.rows and 0 <= col < self.cols
+    
+    def get_random_position(self) -> Position:
+        """Get random position on the board."""
+        return (
+            random.randint(0, self.rows - 1),
+            random.randint(0, self.cols - 1)
+        )
 
-    def is_within_bounds(self, pos):
-        x, y = pos
-        return 0 <= x < self.rows and 0 <= y < self.cols
 
-    def get_random_position(self):
-        return (random.randint(0, self.rows - 1),
-                random.randint(0, self.cols - 1))
-
-# ============ Game Class ============
 class SnakeGame:
-    def __init__(self, rows, cols, initial_pos):
+    """
+    Main game controller orchestrating Snake, Board, and Food.
+    
+    Example:
+        >>> game = SnakeGame(rows=10, cols=10, initial_pos=(5, 5))
+        >>> game.move(Direction.UP)    # True - moved successfully
+        >>> game.move(Direction.RIGHT) # True - moved successfully
+        >>> game.is_game_over          # False
+        >>> game.score                 # 0 (or 10 if food eaten)
+    """
+    
+    def __init__(self, rows: int, cols: int, initial_pos: Position):
+        """
+        Initialize game.
+        
+        Args:
+            rows: Board height
+            cols: Board width
+            initial_pos: Starting position for snake (row, col)
+            
+        Raises:
+            ValueError: If initial position is out of bounds
+        """
         self.board = Board(rows, cols)
+        
+        if not self.board.is_within_bounds(initial_pos):
+            raise ValueError(f"Initial position {initial_pos} is out of bounds")
+        
         self.snake = Snake(initial_pos)
-        self.food = self._place_food()
-        self.score = 0
-        self.game_over = False
-
-    def move(self, direction):
+        self.food: Position = self._place_food()
+        self.score: int = 0
+        self.game_over: bool = False
+    
+    @property
+    def is_game_over(self) -> bool:
+        """Check if game has ended."""
+        return self.game_over
+    
+    def move(self, direction: Direction) -> bool:
+        """
+        Execute one game tick with given direction.
+        
+        Args:
+            direction: Direction to move
+            
+        Returns:
+            True if move successful, False if game over
+            
+        Raises:
+            RuntimeError: If called after game is over
+        """
         if self.game_over:
-            raise Exception("Game is over!")
-
-        # Change direction
+            raise RuntimeError("Game is already over!")
+        
+        # Try to change direction (ignored if opposite)
         self.snake.change_direction(direction)
-
-        # Get next position
-        next_head = self.snake.get_next_head_pos()
-
+        
+        # Calculate next head position
+        next_head = self.snake.get_next_head_position()
+        
         # Check wall collision
         if not self.board.is_within_bounds(next_head):
             self.game_over = True
             return False
-
-        # Check self collision
+        
+        # Check self collision (but not with current tail position)
+        # Note: When moving, tail will vacate before head arrives
+        # But if eating food, tail stays - need to check carefully
         if self.snake.is_collision(next_head):
-            self.game_over = True
-            return False
-
-        # Check food
+            # Exception: if next_head is current tail AND not eating food,
+            # the tail will move away, so no collision
+            if next_head != self.snake.tail or next_head == self.food:
+                self.game_over = True
+                return False
+        
+        # Check if eating food
         if next_head == self.food:
             self.snake.grow(next_head)
             self.score += 10
             self.food = self._place_food()
         else:
             self.snake.move(next_head)
-
+        
         return True
-
-    def _place_food(self):
+    
+    def _place_food(self) -> Position:
+        """Place food at random empty position."""
         while True:
             food_pos = self.board.get_random_position()
             if not self.snake.is_collision(food_pos):
                 return food_pos
-
-    def is_game_over(self):
-        return self.game_over
-
-    def get_score(self):
-        return self.score
-
-    def print_board(self):
-        grid = [['.' for _ in range(self.board.cols)]
+    
+    def get_state(self) -> dict:
+        """Get current game state (for rendering/debugging)."""
+        return {
+            "snake_body": self.snake.get_body_positions(),
+            "snake_head": self.snake.head,
+            "food": self.food,
+            "score": self.score,
+            "game_over": self.game_over,
+            "direction": self.snake.direction.name,
+        }
+    
+    def print_board(self) -> None:
+        """Print visual representation of the game."""
+        # Create grid
+        grid = [['.' for _ in range(self.board.cols)] 
                 for _ in range(self.board.rows)]
-
+        
         # Place snake
         for i, pos in enumerate(self.snake.body):
-            x, y = pos
-            if i == 0:
-                grid[x][y] = 'H'  # Head
-            else:
-                grid[x][y] = 'B'  # Body
-
+            row, col = pos
+            grid[row][col] = 'H' if i == 0 else 'B'
+        
         # Place food
-        fx, fy = self.food
-        grid[fx][fy] = 'F'
-
+        food_row, food_col = self.food
+        if grid[food_row][food_col] == '.':
+            grid[food_row][food_col] = 'F'
+        
         # Print
+        print("+" + "-" * (self.board.cols * 2 - 1) + "+")
         for row in grid:
-            print(' '.join(row))
-        print(f"Score: {self.score}\n")
+            print("|" + " ".join(row) + "|")
+        print("+" + "-" * (self.board.cols * 2 - 1) + "+")
+        print(f"Score: {self.score} | Direction: {self.snake.direction.name}")
+        print()
 
-# ============ Demo ============
+
+# ============ Demo / Usage ============
 if __name__ == "__main__":
-    game = SnakeGame(10, 10, (5, 5))
-
+    print("=== Snake Game Demo ===\n")
+    
+    # Create game
+    game = SnakeGame(rows=10, cols=10, initial_pos=(5, 5))
+    
     print("Initial State:")
     game.print_board()
-
-    game.move(Direction.UP)
-    print("After UP:")
-    game.print_board()
-
-    game.move(Direction.RIGHT)
-    print("After RIGHT:")
-    game.print_board()
-
-    print(f"Game Over: {game.is_game_over()}")
-    print(f"Final Score: {game.get_score()}")
+    
+    # Simulate moves
+    moves = [Direction.UP, Direction.UP, Direction.RIGHT, 
+             Direction.RIGHT, Direction.DOWN]
+    
+    for move in moves:
+        success = game.move(move)
+        print(f"After moving {move.name}:")
+        game.print_board()
+        
+        if not success:
+            print("Game Over!")
+            break
+    
+    print(f"\nFinal Score: {game.score}")
+    print(f"Game Over: {game.is_game_over}")
 ```
-
----
-
-## 🎯 Design Principles Applied
-
-### **1. Single Responsibility Principle (SRP)**
-- `Snake`: Manages snake body and movement
-- `Board`: Manages grid and boundaries
-- `Game`: Orchestrates game logic
-- `Position`: Represents coordinates
-
-### **2. Open/Closed Principle (OCP)**
-Extensible for new features without modifying existing code:
-```java
-// Add obstacles
-class Obstacle {
-    Set<Position> positions;
-}
-
-// Extend game
-class SnakeGameWithObstacles extends SnakeGame {
-    private Set<Position> obstacles;
-
-    @Override
-    public boolean move(Direction direction) {
-        Position nextHead = snake.getNextHeadPosition();
-        if (obstacles.contains(nextHead)) {
-            gameOver = true;
-            return false;
-        }
-        return super.move(direction);
-    }
-}
-```
-
-### **3. Encapsulation**
-- `body` in `Snake` is private (use `getBody()` for access)
-- Game state cannot be modified externally
 
 ---
 
 ## 🚀 Extensions & Follow-ups
 
-### **Extension 1: Multiple Food Types**
-```java
-enum FoodType {
-    NORMAL(10),
-    GOLDEN(50),
-    SPEED_BOOST(20);
-
-    final int points;
-
-    FoodType(int points) {
-        this.points = points;
-    }
-}
-
-class Food {
-    Position position;
-    FoodType type;
-
-    public Food(Position position, FoodType type) {
-        this.position = position;
-        this.type = type;
-    }
-}
+### **Extension 1: Add Obstacles**
+```python
+class SnakeGameWithObstacles(SnakeGame):
+    """Snake game with obstacles on the board."""
+    
+    def __init__(self, rows: int, cols: int, initial_pos: Position, 
+                 obstacles: Set[Position] = None):
+        self.obstacles = obstacles or set()
+        super().__init__(rows, cols, initial_pos)
+    
+    def move(self, direction: Direction) -> bool:
+        next_head = self.snake.get_next_head_position()
+        
+        # Check obstacle collision
+        if next_head in self.obstacles:
+            self.game_over = True
+            return False
+        
+        return super().move(direction)
 ```
 
-### **Extension 2: Power-ups**
-```java
-enum PowerUp {
-    INVINCIBILITY,  // Pass through walls for 5 seconds
-    SLOW_MOTION,    // Slow down snake speed
-    DOUBLE_POINTS   // 2x score for 10 seconds
-}
+### **Extension 2: Multiple Food Types**
+```python
+from enum import Enum
 
-class Game {
-    private Map<PowerUp, Long> activePowerUps; // PowerUp -> expiry time
+class FoodType(Enum):
+    NORMAL = (10, False)    # (points, speed_boost)
+    GOLDEN = (50, False)    # More points
+    SPEED = (20, True)      # Speed boost
+    
+    @property
+    def points(self) -> int:
+        return self.value[0]
 
-    public void applyPowerUp(PowerUp powerUp) {
-        activePowerUps.put(powerUp, System.currentTimeMillis() + 5000);
-    }
-
-    public boolean isActive(PowerUp powerUp) {
-        Long expiry = activePowerUps.get(powerUp);
-        return expiry != null && System.currentTimeMillis() < expiry;
-    }
-}
+@dataclass
+class Food:
+    position: Position
+    food_type: FoodType = FoodType.NORMAL
 ```
 
-### **Extension 3: Obstacles**
-```java
-class Game {
-    private Set<Position> obstacles;
-
-    public void addObstacle(Position pos) {
-        obstacles.add(pos);
-    }
-
-    @Override
-    public boolean move(Direction direction) {
-        Position nextHead = snake.getNextHeadPosition();
-
-        // Check obstacle collision
-        if (obstacles.contains(nextHead)) {
-            gameOver = true;
-            return false;
-        }
-
-        // ... rest of the logic
-    }
-}
+### **Extension 3: Multiplayer**
+```python
+class MultiplayerSnakeGame:
+    """Two-player snake game."""
+    
+    def __init__(self, rows: int, cols: int):
+        self.board = Board(rows, cols)
+        self.snakes = [
+            Snake((2, 2)),   # Player 1
+            Snake((7, 7)),   # Player 2
+        ]
+        self.food = self._place_food()
+    
+    def move(self, player_id: int, direction: Direction) -> bool:
+        snake = self.snakes[player_id]
+        # Check collision with other snakes too
+        for other_snake in self.snakes:
+            if other_snake != snake:
+                if other_snake.is_collision(next_head):
+                    return False
+        # ... rest of logic
 ```
 
-### **Extension 4: Multiplayer**
-```java
-class MultiplayerGame {
-    private List<Snake> snakes;
-    private int currentPlayer;
+### **Extension 4: Game Save/Load**
+```python
+import json
 
-    public boolean move(int playerId, Direction direction) {
-        Snake snake = snakes.get(playerId);
-        // Move logic for specific snake
-    }
-
-    public boolean checkSnakeCollision(Snake snake, Position pos) {
-        // Check collision with other snakes
-        for (Snake otherSnake : snakes) {
-            if (otherSnake != snake && otherSnake.isCollision(pos)) {
-                return true;
-            }
-        }
-        return false;
-    }
-}
+class SnakeGame:
+    def save(self) -> str:
+        """Serialize game state to JSON."""
+        return json.dumps({
+            "snake_body": list(self.snake.body),
+            "direction": self.snake.direction.name,
+            "food": self.food,
+            "score": self.score,
+            "board": (self.board.rows, self.board.cols),
+        })
+    
+    @classmethod
+    def load(cls, json_str: str) -> 'SnakeGame':
+        """Deserialize game from JSON."""
+        data = json.loads(json_str)
+        # Reconstruct game state...
 ```
 
 ---
 
 ## 🧪 Testing Strategy
 
-### **Unit Tests**
+```python
+import pytest
 
-```java
-@Test
-public void testInitialState() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-    assertFalse(game.isGameOver());
-    assertEquals(0, game.getScore());
-}
-
-@Test
-public void testMovement() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-    assertTrue(game.move(Direction.UP));
-    assertFalse(game.isGameOver());
-}
-
-@Test
-public void testWallCollision() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(0, 0));
-    assertFalse(game.move(Direction.UP)); // Hit top wall
-    assertTrue(game.isGameOver());
-}
-
-@Test
-public void testSelfCollision() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-
-    // Create scenario where snake bites itself
-    // Grow snake first
-    game.move(Direction.RIGHT);
-    game.move(Direction.RIGHT);
-    game.move(Direction.RIGHT);
-
-    // Turn around to hit body
-    game.move(Direction.UP);
-    game.move(Direction.LEFT);
-    game.move(Direction.DOWN); // Should hit body
-
-    assertTrue(game.isGameOver());
-}
-
-@Test
-public void testFoodConsumption() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-    int initialScore = game.getScore();
-
-    // Place food manually for testing
-    Position foodPos = game.getFoodPosition();
-    // Move towards food (implementation-specific)
-
-    assertTrue(game.getScore() > initialScore);
-}
-
-@Test
-public void testCannotReverse() {
-    SnakeGame game = new SnakeGame(10, 10, new Position(5, 5));
-    game.move(Direction.RIGHT);
-    game.move(Direction.LEFT); // Should be ignored
-    // Snake should continue moving RIGHT
-}
+class TestSnakeGame:
+    """Unit tests for Snake Game."""
+    
+    def test_initial_state(self):
+        """Game starts with correct initial state."""
+        game = SnakeGame(10, 10, (5, 5))
+        
+        assert not game.is_game_over
+        assert game.score == 0
+        assert game.snake.head == (5, 5)
+        assert game.snake.length == 1
+    
+    def test_basic_movement(self):
+        """Snake moves correctly."""
+        game = SnakeGame(10, 10, (5, 5))
+        
+        result = game.move(Direction.UP)
+        
+        assert result == True
+        assert game.snake.head == (4, 5)
+        assert not game.is_game_over
+    
+    def test_wall_collision(self):
+        """Game ends when snake hits wall."""
+        game = SnakeGame(10, 10, (0, 5))  # At top edge
+        
+        result = game.move(Direction.UP)  # Hit top wall
+        
+        assert result == False
+        assert game.is_game_over
+    
+    def test_self_collision(self):
+        """Game ends when snake hits itself."""
+        game = SnakeGame(10, 10, (5, 5))
+        # Manually grow snake to create collision scenario
+        game.snake.body = deque([(5, 5), (5, 6), (5, 7), (4, 7), (4, 6)])
+        game.snake.occupied = set(game.snake.body)
+        game.snake.direction = Direction.DOWN
+        
+        result = game.move(Direction.DOWN)  # Should hit body
+        
+        assert result == False
+        assert game.is_game_over
+    
+    def test_cannot_reverse_direction(self):
+        """Snake cannot instantly reverse."""
+        game = SnakeGame(10, 10, (5, 5))
+        game.snake.direction = Direction.RIGHT
+        
+        # Try to go left (opposite)
+        game.move(Direction.LEFT)
+        
+        # Should continue RIGHT, not LEFT
+        assert game.snake.direction == Direction.RIGHT
+    
+    def test_food_consumption(self):
+        """Snake grows and score increases when eating."""
+        game = SnakeGame(10, 10, (5, 5))
+        game.food = (4, 5)  # Place food above snake
+        initial_length = game.snake.length
+        
+        game.move(Direction.UP)  # Eat food
+        
+        assert game.snake.length == initial_length + 1
+        assert game.score == 10
+        assert game.food != (4, 5)  # New food placed
+    
+    def test_out_of_bounds_initial_position(self):
+        """Raise error for invalid initial position."""
+        with pytest.raises(ValueError):
+            SnakeGame(10, 10, (100, 100))
+    
+    def test_move_after_game_over(self):
+        """Raise error when moving after game over."""
+        game = SnakeGame(10, 10, (0, 0))
+        game.move(Direction.UP)  # Game over
+        
+        with pytest.raises(RuntimeError):
+            game.move(Direction.RIGHT)
 ```
 
 ---
 
 ## ⚠️ Edge Cases
 
-1. **Snake fills entire board**
-   - Cannot place food
-   - Declare win or end game
-
-2. **Initial position out of bounds**
-   ```java
-   public SnakeGame(int rows, int cols, Position initialPos) {
-       this.board = new Board(rows, cols);
-       if (!board.isWithinBounds(initialPos)) {
-           throw new IllegalArgumentException("Initial position out of bounds");
-       }
-       // ...
-   }
-   ```
-
-3. **Board too small (1×1)**
-   - Game ends immediately
-   - Validate minimum size
-
-4. **Food spawns on snake**
-   - Loop until finding valid position (already handled)
-
-5. **Move called after game over**
-   - Throw exception (already handled)
+| Edge Case | How to Handle |
+|-----------|---------------|
+| **Snake fills entire board** | Cannot place food - declare win |
+| **Initial position out of bounds** | Raise `ValueError` |
+| **Board too small (1×1)** | Game ends immediately |
+| **Food spawns on snake** | Loop until valid position found |
+| **Move called after game over** | Raise `RuntimeError` |
+| **Instant direction reversal** | Ignore invalid direction change |
 
 ---
 
 ## 📊 Complexity Analysis
 
-| Operation | Time | Space |
-|-----------|------|-------|
-| move() | O(1) | O(1) |
-| grow() | O(1) | O(1) |
-| isCollision() | O(1) | O(N) |
-| placeFood() | O(K) | O(1) |
-| printBoard() | O(R×C) | O(R×C) |
+| Operation | Time | Space | Why |
+|-----------|------|-------|-----|
+| `move()` | O(1) | O(1) | deque operations |
+| `grow()` | O(1) | O(1) | appendleft only |
+| `is_collision()` | O(1) | - | set lookup |
+| `place_food()` | O(K) | O(1) | K = attempts |
+| `print_board()` | O(R×C) | O(R×C) | Full grid |
 
-**Where:**
-- N = snake length
-- K = attempts to place food (avg ≈ 1)
-- R × C = board dimensions
-
-**Space Complexity:** O(N + R×C) = O(max board size)
-
----
-
-## 💡 Interview Discussion Points
-
-### **Questions to Ask Interviewer:**
-1. Board size fixed or dynamic?
-2. Starting snake length?
-3. Food appears randomly or at specific positions?
-4. Multiple food items allowed?
-5. Need to support obstacles?
-6. Snake speed changes?
-7. Need to support saving/loading game state?
-
-### **What Interviewers Look For:**
-✅ **Clean class design** (SRP, clear responsibilities)
-✅ **Deque usage** for efficient head/tail operations
-✅ **HashSet** for O(1) collision checks
-✅ **Enum for Direction** (not magic strings)
-✅ **Preventing reverse direction**
-✅ **Edge case handling** (boundaries, null checks)
-✅ **Extensibility discussion** (obstacles, power-ups)
-✅ **Testing mindset**
+**Total Space:** O(snake_length + board_size)
 
 ---
 
 ## ❌ Common Mistakes
 
 ### **MISTAKE 1: Using List instead of Deque** ❌
-```java
-// WRONG - O(N) for removeLast
-List<Position> body = new ArrayList<>();
-body.remove(body.size() - 1); // O(N)
+```python
+# WRONG - O(N) for remove at end
+body = []
+body.pop()  # O(1)
+body.insert(0, new_head)  # O(N)!
 
-// CORRECT - O(1) for both ends
-Deque<Position> body = new LinkedList<>();
-body.removeLast(); // O(1)
+# CORRECT - O(1) for both ends
+body = deque()
+body.popleft()     # O(1)
+body.appendleft()  # O(1)
 ```
 
 ### **MISTAKE 2: O(N) Collision Check** ❌
-```java
-// WRONG - O(N) every time
-public boolean isCollision(Position pos) {
-    for (Position p : body) {
-        if (p.equals(pos)) return true;
-    }
-    return false;
-}
+```python
+# WRONG - O(N) every time
+def is_collision(self, pos):
+    return pos in self.body  # O(N) list search!
 
-// CORRECT - O(1) with HashSet
-private Set<Position> occupiedPositions;
-public boolean isCollision(Position pos) {
-    return occupiedPositions.contains(pos);
-}
+# CORRECT - O(1) with set
+def is_collision(self, pos):
+    return pos in self.occupied  # O(1) set lookup
 ```
 
-### **MISTAKE 3: Not Preventing Reverse Direction** ❌
-```java
-// WRONG - Snake can reverse instantly
-public void move(Direction newDirection) {
-    this.direction = newDirection; // Can go UP then DOWN immediately
-}
+### **MISTAKE 3: Not Preventing Reverse** ❌
+```python
+# WRONG - Snake can reverse and hit itself
+def change_direction(self, new_dir):
+    self.direction = new_dir  # Can go UP then DOWN!
 
-// CORRECT - Check opposite
-public boolean changeDirection(Direction newDirection) {
-    if (direction.isOpposite(newDirection)) {
-        return false;
-    }
-    this.direction = newDirection;
-    return true;
-}
-```
-
-### **MISTAKE 4: Messy Code in One Class** ❌
-```java
-// WRONG - Everything in one class
-public class SnakeGame {
-    int headX, headY;
-    List<int[]> body;
-    int[][] board;
-    int foodX, foodY;
-    // 500 lines of spaghetti code...
-}
+# CORRECT - Check opposite
+def change_direction(self, new_dir):
+    if not self.direction.is_opposite(new_dir):
+        self.direction = new_dir
 ```
 
 ---
 
-## 🏆 Production-Ready Enhancements
+## 💯 Interview Checklist
 
-### **1. Game State Persistence**
-```java
-public String saveGame() {
-    return new Gson().toJson(this);
-}
-
-public static SnakeGame loadGame(String json) {
-    return new Gson().fromJson(json, SnakeGame.class);
-}
-```
-
-### **2. Event Listeners**
-```java
-interface GameListener {
-    void onFoodEaten(Position foodPos, int newScore);
-    void onGameOver(int finalScore);
-    void onSnakeMoved(List<Position> newBody);
-}
-
-class Game {
-    private List<GameListener> listeners = new ArrayList<>();
-
-    public void addListener(GameListener listener) {
-        listeners.add(listener);
-    }
-
-    private void notifyFoodEaten() {
-        for (GameListener l : listeners) {
-            l.onFoodEaten(food, score);
-        }
-    }
-}
-```
-
-### **3. High Score Tracking**
-```java
-class Game {
-    private static int highScore = 0;
-
-    public void updateHighScore() {
-        if (score > highScore) {
-            highScore = score;
-        }
-    }
-
-    public static int getHighScore() {
-        return highScore;
-    }
-}
-```
-
----
-
-## 💯 Best Practices Summary
-
-✅ Use **Deque** for snake body (O(1) operations)
-✅ Use **HashSet** for collision detection (O(1))
-✅ **Separate concerns** (Snake, Board, Game classes)
-✅ Use **Enum** for directions
-✅ **Prevent reverse direction** (gameplay rule)
-✅ Handle **edge cases** (boundaries, null, game over)
-✅ Make code **extensible** (easy to add obstacles, power-ups)
-✅ Write **unit tests** for movement, collision, growth
-✅ Use **meaningful names** (not x1, y1, x2, y2)
-✅ Override **equals() and hashCode()** for Position
-
-**Interview Pro Tip:** After implementing basic version, ask "Should I add obstacles/power-ups?" to show extensibility thinking!
+Before finishing, ensure you've mentioned:
+- [ ] ✅ **deque** for O(1) head/tail operations
+- [ ] ✅ **set** for O(1) collision detection
+- [ ] ✅ **Enum** for directions (not magic strings)
+- [ ] ✅ **SRP** - separate Snake, Board, Game classes
+- [ ] ✅ **Preventing reverse direction**
+- [ ] ✅ **Edge cases** (boundaries, null checks)
+- [ ] ✅ **Extensibility** (obstacles, multiplayer)
+- [ ] ✅ **Testing strategy**
 
 ---
 
 **Related LeetCode Problems:**
 - LeetCode 353: Design Snake Game
-- LeetCode 1242: Web Crawler Multithreaded (similar BFS pattern)
 
 **Real-World Applications:**
 - Nokia Snake (classic game)
 - Slither.io (multiplayer version)
-- Game engines (Unity, Unreal)

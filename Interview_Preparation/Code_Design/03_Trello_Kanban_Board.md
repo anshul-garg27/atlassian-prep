@@ -19,7 +19,7 @@ Design a simplified Trello/Kanban board system where users can create boards, li
 - Support operations: create, move, assign, delete
 - Track card history (optional)
 
-**Input:** User actions (createBoard, addList, addCard, moveCard, etc.)
+**Input:** User actions (create_board, add_list, add_card, move_card, etc.)
 **Output:** Working system with proper data structures and relationships
 
 **Constraints:**
@@ -30,12 +30,26 @@ Design a simplified Trello/Kanban board system where users can create boards, li
 
 ---
 
+## 🎤 How to Explain in Interview
+
+### **Opening Statement (30 seconds)**
+> "I'll design a Trello-like board using Python's `dataclasses` for clean entity modeling. The hierarchy is Board → List → Card, using composition. I'll use UUIDs for unique identifiers and follow the Single Responsibility Principle."
+
+### **Key Points to Mention:**
+1. "Using **dataclasses** for cleaner entity definitions"
+2. "**Composition over inheritance** - Board HAS lists, List HAS cards"
+3. "**UUID** for unique identifiers instead of auto-increment"
+4. "Following **SRP** - separate classes for User, Board, List, Card"
+5. "Easy to extend with **history tracking, permissions, checklists**"
+
+---
+
 ## 🎨 Visual Example
 
 ```text
 Board: "Sprint 2024"
 ├── List: "To Do"
-│   ├── Card: "Implement Rate Limiter" (assigned: Alice)
+│   ├── Card: "Implement Rate Limiter" (assigned: Alice, HIGH)
 │   └── Card: "Write Tests" (assigned: Bob)
 ├── List: "In Progress"
 │   └── Card: "Review PR #123" (assigned: Alice)
@@ -43,10 +57,47 @@ Board: "Sprint 2024"
     └── Card: "Deploy to Staging" (assigned: Charlie)
 
 Operations:
-1. moveCard(card1, "To Do" → "In Progress")
-2. assignCard(card2, Bob)
-3. deleteCard(card3)
-4. archiveList("Done")
+1. move_card(card1, "To Do" → "In Progress")
+2. assign_card(card2, Bob)
+3. delete_card(card3)
+4. add_label(card1, "Backend")
+```
+
+---
+
+## 🎯 Design Patterns Used
+
+### **1. Composition Pattern** ⭐
+Board contains Lists, Lists contain Cards (HAS-A relationships).
+
+```python
+@dataclass
+class Board:
+    lists: List[TaskList] = field(default_factory=list)
+    # Board HAS lists (composition, not inheritance)
+```
+
+### **2. Factory Pattern** (Optional)
+Create entities through service methods for validation.
+
+```python
+class TrelloService:
+    def create_board(self, name: str, owner: User) -> Board:
+        # Validation, logging, etc.
+        board = Board(name=name, owner=owner)
+        self.boards[board.id] = board
+        return board
+```
+
+### **3. Observer Pattern** (For Extensions)
+Notify listeners when cards move or update.
+
+```python
+class Card:
+    def move_to(self, new_list):
+        old_list = self.current_list
+        # ... move logic
+        self._notify_observers("moved", old_list, new_list)
 ```
 
 ---
@@ -57,505 +108,316 @@ Operations:
 ┌────────────┐
 │    User    │
 ├────────────┤
-│ - id       │
-│ - name     │
+│ - id: str  │
+│ - name: str│
 │ - email    │
 └────────────┘
-      │ 1
+      │ 1:N (owns/member)
       │
-      │ *
-┌────────────┐
-│   Board    │ ◆───────┐
-├────────────┤         │
-│ - id       │         │ contains
-│ - name     │         │
-│ - owner    │         │ *
-│ - lists    │◀────────┤
-└────────────┘    ┌────────────┐
-                  │    List    │ ◆───────┐
-                  ├────────────┤         │
-                  │ - id       │         │ contains
-                  │ - name     │         │
-                  │ - position │         │ *
-                  │ - cards    │◀────────┤
-                  └────────────┘    ┌────────────┐
-                                    │    Card    │
-                                    ├────────────┤
-                                    │ - id       │
-                                    │ - title    │
-                                    │ - desc     │
-                                    │ - assignee │
-                                    │ - dueDate  │
-                                    │ - labels   │
-                                    └────────────┘
+      ▼
+┌────────────────┐
+│     Board      │
+├────────────────┤
+│ - id: str      │
+│ - name: str    │
+│ - owner: User  │
+│ - members: Set │
+│ - lists: List  │◀────────┐
+└────────────────┘         │ contains
+                    ┌──────┴─────────┐
+                    │   TaskList     │
+                    ├────────────────┤
+                    │ - id: str      │
+                    │ - name: str    │
+                    │ - position: int│
+                    │ - cards: List  │◀────────┐
+                    └────────────────┘         │ contains
+                                        ┌──────┴────────┐
+                                        │     Card      │
+                                        ├───────────────┤
+                                        │ - id: str     │
+                                        │ - title: str  │
+                                        │ - desc: str   │
+                                        │ - assignee    │
+                                        │ - due_date    │
+                                        │ - labels: Set │
+                                        │ - priority    │
+                                        └───────────────┘
 ```
 
 ---
 
-## 💻 Implementation
-
-### **Java Implementation**
-
-```java
-import java.time.LocalDate;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
-
-// ============ ID Generator ============
-class IdGenerator {
-    private static AtomicLong counter = new AtomicLong(0);
-
-    public static String generate(String prefix) {
-        return prefix + counter.incrementAndGet();
-    }
-}
-
-// ============ User Class ============
-class User {
-    private String id;
-    private String name;
-    private String email;
-
-    public User(String name, String email) {
-        this.id = IdGenerator.generate("USER_");
-        this.name = name;
-        this.email = email;
-    }
-
-    // Getters
-    public String getId() { return id; }
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-}
-
-// ============ Label/Tag Class ============
-enum Priority {
-    LOW, MEDIUM, HIGH, CRITICAL
-}
-
-class Label {
-    private String name;
-    private String color; // Hex color
-
-    public Label(String name, String color) {
-        this.name = name;
-        this.color = color;
-    }
-
-    public String getName() { return name; }
-    public String getColor() { return color; }
-}
-
-// ============ Card Class ============
-class Card {
-    private String id;
-    private String title;
-    private String description;
-    private User assignee;
-    private LocalDate dueDate;
-    private LocalDate createdDate;
-    private Priority priority;
-    private Set<Label> labels;
-    private List<String> comments;
-
-    public Card(String title, String description) {
-        this.id = IdGenerator.generate("CARD_");
-        this.title = title;
-        this.description = description;
-        this.createdDate = LocalDate.now();
-        this.labels = new HashSet<>();
-        this.comments = new ArrayList<>();
-    }
-
-    // Setters
-    public void assign(User user) {
-        this.assignee = user;
-    }
-
-    public void setDueDate(LocalDate dueDate) {
-        this.dueDate = dueDate;
-    }
-
-    public void setPriority(Priority priority) {
-        this.priority = priority;
-    }
-
-    public void addLabel(Label label) {
-        labels.add(label);
-    }
-
-    public void addComment(String comment) {
-        comments.add(comment);
-    }
-
-    // Getters
-    public String getId() { return id; }
-    public String getTitle() { return title; }
-    public String getDescription() { return description; }
-    public User getAssignee() { return assignee; }
-    public LocalDate getDueDate() { return dueDate; }
-    public Priority getPriority() { return priority; }
-
-    @Override
-    public String toString() {
-        return String.format("Card[%s]: %s (Assignee: %s, Due: %s)",
-                id, title,
-                assignee != null ? assignee.getName() : "Unassigned",
-                dueDate != null ? dueDate : "No due date");
-    }
-}
-
-// ============ List Class ============
-class TaskList {
-    private String id;
-    private String name;
-    private int position; // For ordering lists
-    private List<Card> cards;
-
-    public TaskList(String name, int position) {
-        this.id = IdGenerator.generate("LIST_");
-        this.name = name;
-        this.position = position;
-        this.cards = new ArrayList<>();
-    }
-
-    public void addCard(Card card) {
-        cards.add(card);
-    }
-
-    public void removeCard(Card card) {
-        cards.remove(card);
-    }
-
-    public void moveCard(Card card, int newPosition) {
-        if (cards.contains(card)) {
-            cards.remove(card);
-            cards.add(Math.min(newPosition, cards.size()), card);
-        }
-    }
-
-    public List<Card> getCards() {
-        return new ArrayList<>(cards);
-    }
-
-    public Card getCard(String cardId) {
-        return cards.stream()
-                .filter(c -> c.getId().equals(cardId))
-                .findFirst()
-                .orElse(null);
-    }
-
-    // Getters
-    public String getId() { return id; }
-    public String getName() { return name; }
-    public int getPosition() { return position; }
-
-    @Override
-    public String toString() {
-        return String.format("List[%s]: %s (%d cards)", id, name, cards.size());
-    }
-}
-
-// ============ Board Class ============
-class Board {
-    private String id;
-    private String name;
-    private User owner;
-    private List<TaskList> lists;
-    private Set<User> members;
-
-    public Board(String name, User owner) {
-        this.id = IdGenerator.generate("BOARD_");
-        this.name = name;
-        this.owner = owner;
-        this.lists = new ArrayList<>();
-        this.members = new HashSet<>();
-        this.members.add(owner);
-    }
-
-    // List operations
-    public TaskList createList(String name) {
-        TaskList list = new TaskList(name, lists.size());
-        lists.add(list);
-        return list;
-    }
-
-    public void deleteList(String listId) {
-        lists.removeIf(list -> list.getId().equals(listId));
-    }
-
-    public TaskList getList(String listId) {
-        return lists.stream()
-                .filter(list -> list.getId().equals(listId))
-                .findFirst()
-                .orElse(null);
-    }
-
-    // Card operations
-    public Card createCard(String listId, String title, String description) {
-        TaskList list = getList(listId);
-        if (list == null) {
-            throw new IllegalArgumentException("List not found: " + listId);
-        }
-
-        Card card = new Card(title, description);
-        list.addCard(card);
-        return card;
-    }
-
-    public void moveCard(String cardId, String fromListId, String toListId) {
-        TaskList fromList = getList(fromListId);
-        TaskList toList = getList(toListId);
-
-        if (fromList == null || toList == null) {
-            throw new IllegalArgumentException("List not found");
-        }
-
-        Card card = fromList.getCard(cardId);
-        if (card == null) {
-            throw new IllegalArgumentException("Card not found: " + cardId);
-        }
-
-        fromList.removeCard(card);
-        toList.addCard(card);
-    }
-
-    // Member operations
-    public void addMember(User user) {
-        members.add(user);
-    }
-
-    public void removeMember(User user) {
-        if (!user.equals(owner)) {
-            members.remove(user);
-        }
-    }
-
-    // Getters
-    public String getId() { return id; }
-    public String getName() { return name; }
-    public List<TaskList> getLists() { return new ArrayList<>(lists); }
-    public Set<User> getMembers() { return new HashSet<>(members); }
-
-    @Override
-    public String toString() {
-        return String.format("Board[%s]: %s (Owner: %s, %d lists)",
-                id, name, owner.getName(), lists.size());
-    }
-}
-
-// ============ Trello Service ============
-class TrelloService {
-    private Map<String, Board> boards;
-    private Map<String, User> users;
-
-    public TrelloService() {
-        this.boards = new HashMap<>();
-        this.users = new HashMap<>();
-    }
-
-    // User management
-    public User createUser(String name, String email) {
-        User user = new User(name, email);
-        users.put(user.getId(), user);
-        return user;
-    }
-
-    // Board management
-    public Board createBoard(String name, User owner) {
-        Board board = new Board(name, owner);
-        boards.put(board.getId(), board);
-        return board;
-    }
-
-    public Board getBoard(String boardId) {
-        return boards.get(boardId);
-    }
-
-    public void deleteBoard(String boardId) {
-        boards.remove(boardId);
-    }
-
-    // Get all boards for a user
-    public List<Board> getBoardsForUser(User user) {
-        List<Board> userBoards = new ArrayList<>();
-        for (Board board : boards.values()) {
-            if (board.getMembers().contains(user)) {
-                userBoards.add(board);
-            }
-        }
-        return userBoards;
-    }
-}
-
-// ============ Main / Demo ============
-public class Main {
-    public static void main(String[] args) {
-        TrelloService trello = new TrelloService();
-
-        // Create users
-        User alice = trello.createUser("Alice", "alice@example.com");
-        User bob = trello.createUser("Bob", "bob@example.com");
-
-        // Create board
-        Board board = trello.createBoard("Sprint 2024", alice);
-        board.addMember(bob);
-
-        // Create lists
-        TaskList todoList = board.createList("To Do");
-        TaskList inProgressList = board.createList("In Progress");
-        TaskList doneList = board.createList("Done");
-
-        // Create cards
-        Card card1 = board.createCard(todoList.getId(),
-                "Implement Rate Limiter",
-                "Use token bucket algorithm");
-        card1.assign(alice);
-        card1.setPriority(Priority.HIGH);
-
-        Card card2 = board.createCard(todoList.getId(),
-                "Write Tests",
-                "Unit tests for all components");
-        card2.assign(bob);
-        card2.setDueDate(LocalDate.now().plusDays(7));
-
-        // Move card
-        System.out.println("=== Initial State ===");
-        printBoard(board);
-
-        board.moveCard(card1.getId(), todoList.getId(), inProgressList.getId());
-
-        System.out.println("\n=== After Moving Card ===");
-        printBoard(board);
-    }
-
-    private static void printBoard(Board board) {
-        System.out.println(board);
-        for (TaskList list : board.getLists()) {
-            System.out.println("  " + list);
-            for (Card card : list.getCards()) {
-                System.out.println("    - " + card);
-            }
-        }
-    }
-}
-```
-
----
-
-### **Python Implementation**
+## 💻 Python Implementation (Production-Ready)
 
 ```python
+"""
+Trello / Kanban Board System - Low-Level Design
+================================================
+Clean OOP implementation using Python's dataclasses.
+
+Design Patterns:
+- Composition: Board → Lists → Cards
+- Factory Pattern: TrelloService creates entities
+- Single Responsibility: Each class has one purpose
+
+Features:
+- Board management (create, delete)
+- List management (create, reorder)
+- Card management (create, move, assign, labels)
+- Member management (add/remove)
+"""
+
 from dataclasses import dataclass, field
-from typing import List, Set, Optional
+from typing import List, Set, Dict, Optional
 from datetime import date, datetime
 from enum import Enum
 import uuid
 
-# ============ Enums ============
+
+def generate_id(prefix: str = "") -> str:
+    """Generate unique ID with optional prefix."""
+    return f"{prefix}{uuid.uuid4().hex[:8]}"
+
+
 class Priority(Enum):
+    """Card priority levels."""
     LOW = 1
     MEDIUM = 2
     HIGH = 3
     CRITICAL = 4
 
-# ============ User Class ============
+    def __str__(self):
+        return self.name
+
+
 @dataclass
 class User:
+    """
+    User entity.
+    
+    Attributes:
+        name: Display name
+        email: User email (unique identifier in real system)
+        id: Unique identifier
+    """
     name: str
     email: str
-    id: str = field(default_factory=lambda: f"USER_{uuid.uuid4().hex[:8]}")
+    id: str = field(default_factory=lambda: generate_id("USER_"))
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if not isinstance(other, User):
+            return False
+        return self.id == other.id
 
-# ============ Label Class ============
+
 @dataclass
 class Label:
+    """
+    Card label for categorization.
+    
+    Attributes:
+        name: Label text (e.g., "Backend", "Bug")
+        color: Hex color code (e.g., "#FF5733")
+    """
     name: str
-    color: str
+    color: str = "#3B82F6"  # Default blue
+    
+    def __hash__(self):
+        return hash(self.name)
+    
+    def __eq__(self, other):
+        if not isinstance(other, Label):
+            return False
+        return self.name == other.name
 
-# ============ Card Class ============
+
 @dataclass
 class Card:
+    """
+    Card/Task entity.
+    
+    Attributes:
+        title: Card title (required)
+        description: Detailed description
+        assignee: User assigned to the card
+        due_date: Due date for the task
+        priority: Priority level
+        labels: Set of labels
+        created_at: Creation timestamp
+        comments: List of comments
+    """
     title: str
-    description: str
-    id: str = field(default_factory=lambda: f"CARD_{uuid.uuid4().hex[:8]}")
+    description: str = ""
+    id: str = field(default_factory=lambda: generate_id("CARD_"))
     assignee: Optional[User] = None
     due_date: Optional[date] = None
-    created_date: date = field(default_factory=date.today)
     priority: Optional[Priority] = None
     labels: Set[Label] = field(default_factory=set)
+    created_at: datetime = field(default_factory=datetime.now)
     comments: List[str] = field(default_factory=list)
 
-    def assign(self, user: User):
+    def assign(self, user: User) -> None:
+        """Assign card to user."""
         self.assignee = user
 
-    def add_label(self, label: Label):
+    def unassign(self) -> None:
+        """Remove assignee from card."""
+        self.assignee = None
+    
+    def set_due_date(self, due: date) -> None:
+        """Set due date."""
+        self.due_date = due
+    
+    def set_priority(self, priority: Priority) -> None:
+        """Set priority level."""
+        self.priority = priority
+    
+    def add_label(self, label: Label) -> None:
+        """Add label to card."""
         self.labels.add(label)
 
-    def add_comment(self, comment: str):
+    def remove_label(self, label: Label) -> None:
+        """Remove label from card."""
+        self.labels.discard(label)
+    
+    def add_comment(self, comment: str) -> None:
+        """Add comment to card."""
         self.comments.append(comment)
 
+    def is_overdue(self) -> bool:
+        """Check if card is past due date."""
+        if self.due_date is None:
+            return False
+        return date.today() > self.due_date
+    
     def __str__(self):
         assignee_name = self.assignee.name if self.assignee else "Unassigned"
-        due = self.due_date if self.due_date else "No due date"
-        return f"Card[{self.id}]: {self.title} (Assignee: {assignee_name}, Due: {due})"
+        due = self.due_date or "No due date"
+        priority = self.priority or "No priority"
+        return f"Card[{self.id}]: {self.title} | {assignee_name} | Due: {due} | {priority}"
 
-# ============ TaskList Class ============
+
 @dataclass
 class TaskList:
+    """
+    List/Column in a board (e.g., "To Do", "In Progress", "Done").
+    
+    Attributes:
+        name: List name
+        position: Order position in board
+        cards: Cards in this list
+    """
     name: str
-    position: int
-    id: str = field(default_factory=lambda: f"LIST_{uuid.uuid4().hex[:8]}")
+    position: int = 0
+    id: str = field(default_factory=lambda: generate_id("LIST_"))
     cards: List[Card] = field(default_factory=list)
 
-    def add_card(self, card: Card):
+    def add_card(self, card: Card) -> None:
+        """Add card to end of list."""
         self.cards.append(card)
 
-    def remove_card(self, card: Card):
+    def remove_card(self, card: Card) -> bool:
+        """Remove card from list. Returns True if found and removed."""
         if card in self.cards:
             self.cards.remove(card)
+            return True
+        return False
 
     def get_card(self, card_id: str) -> Optional[Card]:
+        """Find card by ID."""
         for card in self.cards:
             if card.id == card_id:
                 return card
         return None
 
+    def move_card_to_position(self, card: Card, position: int) -> None:
+        """Move card to specific position within list."""
+        if card in self.cards:
+            self.cards.remove(card)
+            self.cards.insert(min(position, len(self.cards)), card)
+    
     def __str__(self):
         return f"List[{self.id}]: {self.name} ({len(self.cards)} cards)"
 
-# ============ Board Class ============
+
 @dataclass
 class Board:
+    """
+    Kanban Board containing lists and managing members.
+    
+    Attributes:
+        name: Board name
+        owner: User who created the board
+        members: Set of users with access
+        lists: Ordered lists in the board
+    """
     name: str
     owner: User
-    id: str = field(default_factory=lambda: f"BOARD_{uuid.uuid4().hex[:8]}")
-    lists: List[TaskList] = field(default_factory=list)
+    id: str = field(default_factory=lambda: generate_id("BOARD_"))
     members: Set[User] = field(default_factory=set)
+    lists: List[TaskList] = field(default_factory=list)
+    created_at: datetime = field(default_factory=datetime.now)
 
     def __post_init__(self):
+        """Add owner to members automatically."""
         self.members.add(self.owner)
 
+    # ========== List Operations ==========
+    
     def create_list(self, name: str) -> TaskList:
-        task_list = TaskList(name, len(self.lists))
+        """Create new list at end of board."""
+        task_list = TaskList(name=name, position=len(self.lists))
         self.lists.append(task_list)
         return task_list
 
     def get_list(self, list_id: str) -> Optional[TaskList]:
+        """Find list by ID."""
         for lst in self.lists:
             if lst.id == list_id:
                 return lst
         return None
 
-    def create_card(self, list_id: str, title: str, description: str) -> Card:
+    def get_list_by_name(self, name: str) -> Optional[TaskList]:
+        """Find list by name."""
+        for lst in self.lists:
+            if lst.name == name:
+                return lst
+        return None
+    
+    def delete_list(self, list_id: str) -> bool:
+        """Delete list by ID. Returns True if found and deleted."""
+        for i, lst in enumerate(self.lists):
+            if lst.id == list_id:
+                self.lists.pop(i)
+                return True
+        return False
+    
+    def reorder_lists(self, list_ids: List[str]) -> None:
+        """Reorder lists based on provided ID order."""
+        id_to_list = {lst.id: lst for lst in self.lists}
+        self.lists = [id_to_list[lid] for lid in list_ids if lid in id_to_list]
+        for i, lst in enumerate(self.lists):
+            lst.position = i
+    
+    # ========== Card Operations ==========
+    
+    def create_card(self, list_id: str, title: str, 
+                    description: str = "") -> Card:
+        """Create card in specified list."""
         task_list = self.get_list(list_id)
         if not task_list:
             raise ValueError(f"List not found: {list_id}")
 
-        card = Card(title, description)
+        card = Card(title=title, description=description)
         task_list.add_card(card)
         return card
 
-    def move_card(self, card_id: str, from_list_id: str, to_list_id: str):
+    def move_card(self, card_id: str, from_list_id: str, 
+                  to_list_id: str) -> bool:
+        """Move card between lists."""
         from_list = self.get_list(from_list_id)
         to_list = self.get_list(to_list_id)
 
@@ -568,204 +430,334 @@ class Board:
 
         from_list.remove_card(card)
         to_list.add_card(card)
-
-    def add_member(self, user: User):
+        return True
+    
+    def delete_card(self, card_id: str) -> bool:
+        """Delete card from any list. Returns True if found."""
+        for lst in self.lists:
+            card = lst.get_card(card_id)
+            if card:
+                lst.remove_card(card)
+                return True
+        return False
+    
+    def find_card(self, card_id: str) -> Optional[Card]:
+        """Find card in any list."""
+        for lst in self.lists:
+            card = lst.get_card(card_id)
+            if card:
+                return card
+        return None
+    
+    # ========== Member Operations ==========
+    
+    def add_member(self, user: User) -> None:
+        """Add member to board."""
         self.members.add(user)
 
+    def remove_member(self, user: User) -> bool:
+        """Remove member (cannot remove owner)."""
+        if user == self.owner:
+            return False
+        self.members.discard(user)
+        return True
+    
+    def is_member(self, user: User) -> bool:
+        """Check if user is a member."""
+        return user in self.members
+    
+    # ========== Query Operations ==========
+    
+    def get_all_cards(self) -> List[Card]:
+        """Get all cards across all lists."""
+        return [card for lst in self.lists for card in lst.cards]
+    
+    def get_cards_by_assignee(self, user: User) -> List[Card]:
+        """Get all cards assigned to a user."""
+        return [card for card in self.get_all_cards() 
+                if card.assignee == user]
+    
+    def get_overdue_cards(self) -> List[Card]:
+        """Get all overdue cards."""
+        return [card for card in self.get_all_cards() 
+                if card.is_overdue()]
+    
+    def get_cards_by_label(self, label: Label) -> List[Card]:
+        """Get all cards with a specific label."""
+        return [card for card in self.get_all_cards() 
+                if label in card.labels]
+    
     def __str__(self):
-        return f"Board[{self.id}]: {self.name} (Owner: {self.owner.name}, {len(self.lists)} lists)"
+        return f"Board[{self.id}]: {self.name} | Owner: {self.owner.name} | {len(self.lists)} lists"
 
-# ============ Trello Service ============
+
 class TrelloService:
+    """
+    Service layer for managing boards and users.
+    Acts as a facade for the system.
+    """
+    
     def __init__(self):
-        self.boards = {}
-        self.users = {}
+        self.boards: Dict[str, Board] = {}
+        self.users: Dict[str, User] = {}
 
     def create_user(self, name: str, email: str) -> User:
-        user = User(name, email)
+        """Create and register a new user."""
+        user = User(name=name, email=email)
         self.users[user.id] = user
         return user
 
     def create_board(self, name: str, owner: User) -> Board:
-        board = Board(name, owner)
+        """Create and register a new board."""
+        board = Board(name=name, owner=owner)
         self.boards[board.id] = board
         return board
 
     def get_board(self, board_id: str) -> Optional[Board]:
+        """Get board by ID."""
         return self.boards.get(board_id)
 
+    def delete_board(self, board_id: str) -> bool:
+        """Delete board. Returns True if found."""
+        if board_id in self.boards:
+            del self.boards[board_id]
+            return True
+        return False
+    
     def get_boards_for_user(self, user: User) -> List[Board]:
+        """Get all boards where user is a member."""
         return [board for board in self.boards.values()
-                if user in board.members]
+                if board.is_member(user)]
 
-# ============ Demo ============
+
+# ============ Demo / Usage ============
 if __name__ == "__main__":
+    print("=== Trello Board System Demo ===\n")
+    
+    # Create service
     trello = TrelloService()
 
     # Create users
     alice = trello.create_user("Alice", "alice@example.com")
     bob = trello.create_user("Bob", "bob@example.com")
+    print(f"Created users: {alice.name}, {bob.name}")
 
     # Create board
     board = trello.create_board("Sprint 2024", alice)
     board.add_member(bob)
+    print(f"\nCreated board: {board}")
 
     # Create lists
     todo_list = board.create_list("To Do")
-    in_progress_list = board.create_list("In Progress")
+    progress_list = board.create_list("In Progress")
     done_list = board.create_list("Done")
+    print(f"\nCreated lists: {[l.name for l in board.lists]}")
 
     # Create cards
     card1 = board.create_card(todo_list.id, "Implement Rate Limiter",
                               "Use token bucket algorithm")
     card1.assign(alice)
-    card1.priority = Priority.HIGH
+    card1.set_priority(Priority.HIGH)
+    card1.add_label(Label("Backend", "#10B981"))
 
     card2 = board.create_card(todo_list.id, "Write Tests",
                               "Unit tests for all components")
     card2.assign(bob)
-
-    # Print initial state
-    print("=== Initial State ===")
+    card2.set_due_date(date.today())
+    
+    card3 = board.create_card(progress_list.id, "Review PR #123",
+                              "Security review needed")
+    card3.assign(alice)
+    
+    # Print board state
+    print("\n" + "=" * 50)
+    print("BOARD STATE")
+    print("=" * 50)
     print(board)
+    print("-" * 50)
     for lst in board.lists:
-        print(f"  {lst}")
+        print(f"\n📋 {lst.name}")
         for card in lst.cards:
-            print(f"    - {card}")
+            print(f"   └─ {card}")
 
     # Move card
-    board.move_card(card1.id, todo_list.id, in_progress_list.id)
+    print("\n" + "=" * 50)
+    print("AFTER MOVING CARD")
+    print("=" * 50)
+    board.move_card(card1.id, todo_list.id, progress_list.id)
 
-    print("\n=== After Moving Card ===")
-    print(board)
     for lst in board.lists:
-        print(f"  {lst}")
+        print(f"\n📋 {lst.name}")
         for card in lst.cards:
-            print(f"    - {card}")
+            print(f"   └─ {card}")
+    
+    # Query operations
+    print("\n" + "=" * 50)
+    print("QUERIES")
+    print("=" * 50)
+    print(f"\nAlice's cards: {len(board.get_cards_by_assignee(alice))}")
+    print(f"Overdue cards: {len(board.get_overdue_cards())}")
 ```
 
 ---
 
 ## 🚀 Extensions & Follow-ups
 
-### **1. Card History/Activity Log**
-```java
-class Activity {
-    User user;
-    String action; // "created", "moved", "assigned", "commented"
-    LocalDateTime timestamp;
-    String details;
-}
+### **Extension 1: Activity/History Log**
+```python
+from datetime import datetime
 
-class Card {
-    List<Activity> history = new ArrayList<>();
+@dataclass
+class Activity:
+    """Activity log entry."""
+    user: User
+    action: str  # "created", "moved", "assigned", "commented"
+    timestamp: datetime
+    details: str
 
-    public void addActivity(User user, String action, String details) {
-        history.add(new Activity(user, action, LocalDateTime.now(), details));
-    }
-}
+@dataclass
+class Card:
+    history: List[Activity] = field(default_factory=list)
+    
+    def log_activity(self, user: User, action: str, details: str = ""):
+        self.history.append(Activity(user, action, datetime.now(), details))
+    
+    def assign(self, user: User, assigned_by: User):
+        self.assignee = user
+        self.log_activity(assigned_by, "assigned", f"Assigned to {user.name}")
 ```
 
-### **2. Checklist within Cards**
-```java
-class ChecklistItem {
-    String text;
-    boolean completed;
-}
+### **Extension 2: Checklist**
+```python
+@dataclass
+class ChecklistItem:
+    text: str
+    completed: bool = False
 
-class Card {
-    List<ChecklistItem> checklist = new ArrayList<>();
-
-    public void addChecklistItem(String text) {
-        checklist.add(new ChecklistItem(text, false));
-    }
-
-    public int getCompletionPercentage() {
-        long completed = checklist.stream().filter(i -> i.completed).count();
-        return (int) (completed * 100 / checklist.size());
-    }
-}
+@dataclass
+class Card:
+    checklist: List[ChecklistItem] = field(default_factory=list)
+    
+    def add_checklist_item(self, text: str):
+        self.checklist.append(ChecklistItem(text))
+    
+    def toggle_checklist_item(self, index: int):
+        if 0 <= index < len(self.checklist):
+            self.checklist[index].completed = not self.checklist[index].completed
+    
+    @property
+    def checklist_progress(self) -> float:
+        if not self.checklist:
+            return 0.0
+        completed = sum(1 for item in self.checklist if item.completed)
+        return completed / len(self.checklist) * 100
 ```
 
-### **3. Card Filtering & Search**
-```java
-class Board {
-    public List<Card> filterCards(Predicate<Card> filter) {
-        return lists.stream()
-                .flatMap(list -> list.getCards().stream())
-                .filter(filter)
-                .collect(Collectors.toList());
-    }
+### **Extension 3: Permissions/Access Control**
+```python
+class Permission(Enum):
+    VIEW = 1
+    EDIT = 2
+    ADMIN = 3
 
-    // Usage examples
-    List<Card> aliceCards = board.filterCards(c -> c.getAssignee() == alice);
-    List<Card> overdueCards = board.filterCards(c ->
-            c.getDueDate() != null && c.getDueDate().isBefore(LocalDate.now()));
-    List<Card> highPriorityCards = board.filterCards(c ->
-            c.getPriority() == Priority.HIGH || c.getPriority() == Priority.CRITICAL);
-}
-```
-
-### **4. Permissions/Access Control**
-```java
-enum Permission {
-    VIEW, EDIT, ADMIN
-}
-
-class Board {
-    Map<User, Permission> permissions = new HashMap<>();
-
-    public void setPermission(User user, Permission permission) {
-        permissions.put(user, permission);
-    }
-
-    public boolean canEdit(User user) {
-        Permission perm = permissions.getOrDefault(user, Permission.VIEW);
-        return perm == Permission.EDIT || perm == Permission.ADMIN;
-    }
-}
+@dataclass
+class Board:
+    permissions: Dict[str, Permission] = field(default_factory=dict)
+    
+    def set_permission(self, user: User, permission: Permission):
+        self.permissions[user.id] = permission
+    
+    def can_edit(self, user: User) -> bool:
+        perm = self.permissions.get(user.id, Permission.VIEW)
+        return perm in (Permission.EDIT, Permission.ADMIN)
 ```
 
 ---
 
 ## 🧪 Testing Strategy
 
-```java
-@Test
-public void testCreateBoard() {
-    User alice = new User("Alice", "alice@example.com");
-    Board board = new Board("Test Board", alice);
+```python
+import pytest
+from datetime import date, timedelta
 
-    assertEquals("Test Board", board.getName());
-    assertEquals(alice, board.getOwner());
-    assertTrue(board.getMembers().contains(alice));
-}
-
-@Test
-public void testMoveCard() {
-    Board board = new Board("Board", owner);
-    TaskList list1 = board.createList("List 1");
-    TaskList list2 = board.createList("List 2");
-
-    Card card = board.createCard(list1.getId(), "Card", "Desc");
-
-    assertEquals(1, list1.getCards().size());
-    assertEquals(0, list2.getCards().size());
-
-    board.moveCard(card.getId(), list1.getId(), list2.getId());
-
-    assertEquals(0, list1.getCards().size());
-    assertEquals(1, list2.getCards().size());
-}
-
-@Test(expected = IllegalArgumentException.class)
-public void testMoveCardToInvalidList() {
-    Board board = new Board("Board", owner);
-    TaskList list = board.createList("List");
-    Card card = board.createCard(list.getId(), "Card", "Desc");
-
-    board.moveCard(card.getId(), list.getId(), "INVALID_LIST");
-}
+class TestTrelloBoard:
+    
+    def test_create_board(self):
+        """Board created with owner as member."""
+        alice = User("Alice", "alice@example.com")
+        board = Board(name="Test Board", owner=alice)
+        
+        assert board.name == "Test Board"
+        assert board.owner == alice
+        assert alice in board.members
+    
+    def test_create_list(self):
+        """Lists created with correct position."""
+        board = Board("Board", User("Alice", "alice@example.com"))
+        
+        list1 = board.create_list("To Do")
+        list2 = board.create_list("Done")
+        
+        assert len(board.lists) == 2
+        assert list1.position == 0
+        assert list2.position == 1
+    
+    def test_move_card(self):
+        """Card moves between lists correctly."""
+        board = Board("Board", User("Alice", "alice@example.com"))
+        list1 = board.create_list("List 1")
+        list2 = board.create_list("List 2")
+        card = board.create_card(list1.id, "Card", "Desc")
+        
+        assert len(list1.cards) == 1
+        assert len(list2.cards) == 0
+        
+        board.move_card(card.id, list1.id, list2.id)
+        
+        assert len(list1.cards) == 0
+        assert len(list2.cards) == 1
+    
+    def test_move_card_invalid_list(self):
+        """Moving to invalid list raises error."""
+        board = Board("Board", User("Alice", "alice@example.com"))
+        list1 = board.create_list("List 1")
+        card = board.create_card(list1.id, "Card", "Desc")
+        
+        with pytest.raises(ValueError):
+            board.move_card(card.id, list1.id, "INVALID_ID")
+    
+    def test_card_assignment(self):
+        """Cards can be assigned and unassigned."""
+        alice = User("Alice", "alice@example.com")
+        card = Card("Task")
+        
+        card.assign(alice)
+        assert card.assignee == alice
+        
+        card.unassign()
+        assert card.assignee is None
+    
+    def test_overdue_cards(self):
+        """Overdue cards detected correctly."""
+        board = Board("Board", User("Alice", "alice@example.com"))
+        lst = board.create_list("List")
+        card = board.create_card(lst.id, "Card")
+        
+        # Set due date in past
+        card.set_due_date(date.today() - timedelta(days=1))
+        
+        overdue = board.get_overdue_cards()
+        assert card in overdue
+    
+    def test_cannot_remove_owner(self):
+        """Owner cannot be removed from board."""
+        alice = User("Alice", "alice@example.com")
+        board = Board("Board", alice)
+        
+        result = board.remove_member(alice)
+        
+        assert result == False
+        assert alice in board.members
 ```
 
 ---
@@ -774,31 +766,32 @@ public void testMoveCardToInvalidList() {
 
 | Operation | Time | Space |
 |-----------|------|-------|
-| createBoard | O(1) | O(1) |
-| createList | O(1) | O(1) |
-| createCard | O(1) | O(1) |
-| moveCard | O(N) | O(1) |
-| filterCards | O(N×M) | O(K) |
+| `create_board` | O(1) | O(1) |
+| `create_list` | O(1) | O(1) |
+| `create_card` | O(1) | O(1) |
+| `move_card` | O(L + C) | O(1) |
+| `get_all_cards` | O(L × C) | O(L × C) |
+| `get_cards_by_assignee` | O(L × C) | O(K) |
 
-**Where:** N = lists, M = cards per list, K = matching cards
+**Where:** L = lists, C = cards per list, K = matching cards
 
 ---
 
-## 💯 Summary
+## 💯 Interview Checklist
 
-✅ Clear class hierarchy (Board → List → Card)
-✅ Proper encapsulation (private fields, public methods)
-✅ ID generation for uniqueness
-✅ Support for members, labels, priorities
-✅ Easy to extend (activities, checklists, permissions)
-✅ Thread-safety considerations (use ConcurrentHashMap in production)
-✅ Clean separation of concerns
-
-**Interview Pro Tip:** Start simple, then ask "Should I add labels/checklists/history?" to show extensibility thinking!
+Before finishing, ensure you've mentioned:
+- [ ] ✅ **Dataclasses** for clean entity modeling
+- [ ] ✅ **Composition** (Board HAS Lists HAS Cards)
+- [ ] ✅ **UUID** for unique identifiers
+- [ ] ✅ **SRP** - separate classes for each entity
+- [ ] ✅ **Member management** (owner can't be removed)
+- [ ] ✅ **Query methods** (by assignee, overdue, label)
+- [ ] ✅ **Extensions** (history, checklist, permissions)
+- [ ] ✅ **Testing strategy**
 
 ---
 
 **Related Problems:**
-- Jira board design
+- Jira Board Design
 - GitHub Projects
 - Monday.com

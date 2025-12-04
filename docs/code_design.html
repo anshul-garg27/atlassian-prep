@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atlassian Interview Prep</title>
+    <title>Atlassian Code Design LLD</title>
     
     <!-- Fonts: Plus Jakarta Sans (Headings) + Inter (Body) + JetBrains Mono (Code) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -556,13 +556,13 @@
                                 </div>
                                 <div>
                                     <h1 className="font-display font-bold text-white text-lg leading-none">Interview<span className="text-primary">.io</span></h1>
-                                    <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Atlassian Prep</span>
+                                    <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Code Design LLD</span>
                                 </div>
                             </div>
 
                             <nav className="flex gap-4 text-xs font-medium text-neutral-400 mb-6">
-                                <a href="index.html" className="text-primary hover:text-white">DSA</a>
-                                <a href="code_design.html" className="hover:text-white transition-colors">LLD</a>
+                                <a href="index.html" className="hover:text-white transition-colors">DSA</a>
+                                <a href="code_design.html" className="text-primary hover:text-white">LLD</a>
                                 <a href="experiences.html" className="hover:text-white transition-colors">Experiences</a>
                             </nav>
 
@@ -646,9 +646,9 @@
 
             useEffect(() => {
                 if (window.CONTENT_DATA) {
-                    const ds = window.CONTENT_DATA.find(c => c.name === "Data_Structures");
-                    if (ds && ds.children) {
-                        const sorted = [...ds.children].sort((a, b) => a.name.localeCompare(b.name));
+                    const cd = window.CONTENT_DATA.find(c => c.name === "Code_Design");
+                    if (cd && cd.children) {
+                        const sorted = [...cd.children].sort((a, b) => a.name.localeCompare(b.name));
                         const processed = sorted.map(item => ({
                             ...item,
                             title: item.name.replace(/^\d+_/, '').replace(/\.md$/, '').replace(/_/g, ' ')
@@ -710,7 +710,7 @@
                                 {activeItem ? (
                                     <div className="animate-fade-in">
                                         <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-500 mb-8 uppercase tracking-widest">
-                                            <span>Data Structures</span>
+                                            <span>Code Design (LLD)</span>
                                             <span className="text-neutral-700">/</span>
                                             <span className="text-primary">{activeItem.title}</span>
                                         </div>
