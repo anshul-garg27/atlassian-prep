@@ -107,6 +107,107 @@ Time  Tokens  Action
 4. ✅ Easy to reason about and explain
 5. ✅ Maps well to real-world scenarios
 
+#### 🪣 **Token Bucket - Detailed Visual Example**
+
+Think of it like a **bucket of tickets** at an arcade:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  SETUP:                                                      │
+│  • Bucket can hold MAX 5 tokens (capacity)                  │
+│  • 1 new token drops in every second (refill rate)          │
+│  • Each API request needs 1 token to proceed                │
+│  • Bucket starts FULL (5 tokens)                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Step-by-Step Timeline:**
+
+```text
+TIME 0.0s - Bucket starts full
+┌───────────┐
+│ 🟢🟢🟢🟢🟢 │  5 tokens available
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 0.1s - User makes 1 request
+┌───────────┐
+│ 🟢🟢🟢🟢⚪ │  4 tokens left  ✅ ALLOWED (consumed 1 token)
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 0.2s - User makes 3 requests at once (burst!)
+┌───────────┐
+│ 🟢⚪⚪⚪⚪ │  1 token left   ✅ ALL 3 ALLOWED (consumed 3 tokens)
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 0.3s - User makes 2 more requests
+┌───────────┐
+│ ⚪⚪⚪⚪⚪ │  0 tokens       ✅ 1st ALLOWED, ❌ 2nd DENIED!
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 0.5s - User tries another request (0.2s passed)
+┌───────────┐
+│ ⚪⚪⚪⚪⚪ │  0.2 tokens     ❌ DENIED (need 1 full token)
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 1.3s - User waits 1 second total
+┌───────────┐
+│ 🟢⚪⚪⚪⚪ │  1 token        ✅ ALLOWED!
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 6.3s - User waits 5 more seconds (bucket refills)
+┌───────────┐
+│ 🟢🟢🟢🟢🟢 │  5 tokens       Back to full! (capped at capacity)
+└───────────┘
+
+─────────────────────────────────────────────────────────────
+
+TIME 10.3s - 4 more seconds pass (already full)
+┌───────────┐
+│ 🟢🟢🟢🟢🟢 │  STILL 5        Tokens don't overflow past max!
+└───────────┘
+```
+
+**Key Insights:**
+
+| Concept | Explanation |
+|---------|-------------|
+| **Capacity (5)** | Maximum burst you can handle at once |
+| **Refill Rate (1/sec)** | Sustained rate over time |
+| **Tokens are fractional** | After 0.5s, you have 0.5 tokens (need 1 to allow) |
+| **No overflow** | Bucket never exceeds capacity, even if idle for hours |
+
+**The Core Math:**
+
+```python
+# At any time:
+tokens_available = min(
+    capacity,                                    # Never exceed max
+    last_tokens + (time_elapsed * refill_rate)   # Add based on time
+)
+
+# Can I make a request?
+if tokens_available >= 1:
+    tokens_available -= 1
+    return "✅ ALLOWED"
+else:
+    return "❌ DENIED"
+```
+
+**Real-World Analogy:**
+> Imagine a coffee shop that gives you **5 free coffee stamps** when you sign up. You can use all 5 immediately (burst!). After that, you earn **1 stamp per day**. If you don't visit for a week, you'll have 5 stamps again (max), not 7.
+
 ---
 
 ### **PHASE 3: High-Level Design (2-3 minutes)**
